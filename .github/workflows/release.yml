@@ -3,6 +3,10 @@
 # - v* タグを push すると: Windows 上で Inno Setup ビルド → リリースに
 #   ShineosLocalAI-Setup-<version>.exe を自動添付
 # - workflow_dispatch で: ビルドのみ（アーティファクト確認用）
+#
+# 注意: Inno Setup は 6.7.3（最終6系）を使用する。
+#   7系は API が変更され、かつ「Non-commercial use only」のため商用利用に
+#   ライセンスが必要になる可能性がある。6系は商用利用が無償。
 name: build-release
 
 on:
@@ -20,13 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Inno Setup 7
+      - name: Install Inno Setup 6.7.3
         shell: pwsh
         run: |
           $iscc = 'C:\InnoSetup\ISCC.exe'
           if (-not (Test-Path $iscc)) {
             # 公式GitHubリリースから直接取得（download.php はスタブHTMLを返すため不使用）
-            curl.exe -L --fail --retry 3 -o "$env:TEMP\innosetup.exe" https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
+            curl.exe -L --fail --retry 3 -o "$env:TEMP\innosetup.exe" https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup download failed" }
             $size = (Get-Item "$env:TEMP\innosetup.exe").Length
             if ($size -lt 5MB) { throw "Inno Setup download looks invalid (${size} bytes)" }

@@ -144,7 +144,7 @@ shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-lo
 │   ├── build.md                       ← 本ドキュメント
 │   └── user-guide.md                  # ユーザー向けマニュアル（配布物に同梱）
 ├── installer/
-│   └── installer.iss                  # Inno Setup 7 スクリプト（本体）
+│   └── installer.iss                  # Inno Setup 6.7.3 スクリプト（本体）
 ├── scripts/
 │   ├── preflight.ps1                  # OS/ポート/RAMチェック → preflight.ini
 │   ├── setup_python.ps1               # Python 3.12 → {app}\python
@@ -181,13 +181,17 @@ shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-lo
 ### 6.1 前提
 
 - Windows 10/11（64bit）の開発機
-- [Inno Setup 7](https://jrsoftware.org/isinfo.php) 導入済み（`winget install --id=JRSoftware.InnoSetup.7 -e` でも可）
+- [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) 導入済み
+  （`winget install --id=JRSoftware.InnoSetup -e` でも可）
+- ⚠️ **Inno Setup 7系は不使用**: 7系は API が変更され（`Add` が1引数化など）、かつ
+  ISCC が「Non-commercial use only」と表示するため商用利用にライセンスが必要になる
+  可能性がある。6系（6.7.3）は商用利用が無償で、本スクリプトは6系APIで書かれている
 
 ### 6.2 コンパイル
 
 ```
 # コマンドライン（Inno Setup 付属の ISCC.exe）
-"C:\Program Files (x86)\Inno Setup 7\ISCC.exe" installer\installer.iss
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\installer.iss
 ```
 
 または GUI の Inno Setup で `installer\installer.iss` を開いて「Compile」。
@@ -315,7 +319,7 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 exe のビルドは **GitHub Actions が自動実行**する（`.github/workflows/release.yml`）:
 
 1. バージョンタグを push（例: `git tag v1.0.0 && git push origin v1.0.0`）
-2. ワークフローが Windows ランナーで Inno Setup 7 を導入 → `ISCC.exe installer\installer.iss` でビルド
+2. ワークフローが Windows ランナーで Inno Setup 6.7.3 を導入 → `ISCC.exe installer\installer.iss` でビルド
 3. 成功すると **GitHub Releases に `ShineosLocalAI-Setup-<version>.exe` が自動添付**される
 
 手動ビルド（workflow_dispatch）でビルドのみ行いアーティファクト確認も可能。
