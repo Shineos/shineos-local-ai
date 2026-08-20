@@ -64,12 +64,14 @@ jobs:
           Get-ChildItem dist | Select-Object Name, Length
 
       # ---- SignPath コード署名 ----
+      # upload-artifact は既定でZIP化するため archive: false で生のexeを渡す
+      # （Artifact設定の <pe-file> ルートと一致させる。SignPath公式ドキュメント推奨）
       - name: Upload unsigned artifact (for SignPath)
         id: upload-unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: unsigned-exe
           path: dist/*.exe
+          archive: false
           if-no-files-found: error
 
       - name: Submit signing request to SignPath
@@ -86,7 +88,7 @@ jobs:
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 600
           output-artifact-directory: signed
-          skip-decompress: true
+          skip-decompress: true  # archive:false で生のexeが返るためそのまま保存
 
       - name: Replace unsigned exe with signed exe
         shell: pwsh
