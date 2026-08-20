@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -163,7 +163,7 @@ begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
     'Shineos Local AI のセットアップを実行しています。' + #13#10 +
-    '完了まで約20〜50分かかります（AIモデルのダウンロードを含みます）。' + #13#10 +
+    '完了まで約30〜90分かかります（Ollama本体1.5GB＋AIモデル3.4GBなど合計約6GBのダウンロードを含みます）。' + #13#10 +
     'インストール中はウィンドウを閉じないでください。');
   try
     ProgressPage.Show;
@@ -194,7 +194,7 @@ begin
     end;
 
     ProgressPage.SetProgress(20, 100);
-    ProgressPage.SetText('Ollama（AI実行エンジン）をインストール中...', 'ダウンロードのため数分かかることがあります');
+    ProgressPage.SetText('Ollama（AI実行エンジン）をインストール中...', '本体1.5GBのダウンロードのため10〜40分かかることがあります');
     if not RunPowerShell('setup_ollama.ps1',
         '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '"', RC)
        or (RC <> 0) then
@@ -205,7 +205,7 @@ begin
     end;
 
     ProgressPage.SetProgress(45, 100);
-    ProgressPage.SetText('AIモデルをダウンロード中（' + SelectedModel + '）...', '約3〜4GB・回線により10〜40分');
+    ProgressPage.SetText('AIモデルをダウンロード中（' + SelectedModel + '）...', '約3.7GB・回線により10〜60分');
     if not RunPowerShell('setup_openwebui.ps1',
         '-AppDir "' + AppDir + '" -Mode models -Model "' + SelectedModel + '"', RC)
        or (RC <> 0) then

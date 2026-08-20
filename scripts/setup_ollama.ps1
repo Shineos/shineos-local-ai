@@ -22,6 +22,7 @@ function Get-OllamaExe {
     return $null
 }
 
+try {
 Log '--- setup_ollama start ---'
 $ollamaExe = Get-OllamaExe
 
@@ -32,6 +33,9 @@ if (-not $ollamaExe) {
         Log "downloading $url"
         & curl.exe -L --fail --retry 3 --connect-timeout 30 -o $installer $url
         if ($LASTEXITCODE -ne 0) { throw "OllamaSetup download failed (curl exit $LASTEXITCODE)" }
+        $size = (Get-Item $installer).Length
+        Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
+        if ($size -lt 100MB) { throw "OllamaSetup download looks invalid (${size} bytes) - proxy/block page の可能性" }
     }
     Log 'installing Ollama (silent)'
     $p = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
@@ -79,4 +83,10 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 if (-not $ready) { throw 'Ollama API (127.0.0.1:11434) did not become ready' }
 Log '--- setup_ollama done ---'
+}
+catch {
+    Log "ERROR: $($_.Exception.Message)"
+    Log "STACK: $($_.ScriptStackTrace)"
+    exit 1
+}
 exit 0

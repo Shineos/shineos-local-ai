@@ -13,6 +13,7 @@ $LogFile = Join-Path $AppDir 'install.log'
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 function Log { param([string]$Message) "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8 }
 
+try {
 Log '--- register_service start ---'
 $nssm = Join-Path $AppDir 'tools\nssm.exe'
 if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
@@ -68,4 +69,10 @@ Log 'starting service'
 & $nssm start $svc | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'service start failed' }
 Log '--- register_service done ---'
+}
+catch {
+    Log "ERROR: $($_.Exception.Message)"
+    Log "STACK: $($_.ScriptStackTrace)"
+    exit 1
+}
 exit 0

@@ -26,6 +26,7 @@ function Get-OllamaExe {
     return $null
 }
 
+try {
 if ($Mode -eq 'models') {
     # ---------- モデルダウンロード ----------
     Log "--- models: $Model / $EmbeddingModel ---"
@@ -71,5 +72,10 @@ elseif ($Mode -eq 'app') {
 else {
     throw "unknown mode: $Mode"
 }
-
+}
+catch {
+    Log "ERROR: $($_.Exception.Message)"
+    Log "STACK: $($_.ScriptStackTrace)"
+    exit 1
+}
 exit 0
