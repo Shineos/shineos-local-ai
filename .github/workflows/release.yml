@@ -23,22 +23,34 @@ jobs:
       - name: Install Inno Setup 7
         shell: pwsh
         run: |
-          $iscc = 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
+          $iscc = 'C:\InnoSetup\ISCC.exe'
           if (-not (Test-Path $iscc)) {
             # 公式GitHubリリースから直接取得（download.php はスタブHTMLを返すため不使用）
             curl.exe -L --fail --retry 3 -o "$env:TEMP\innosetup.exe" https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup download failed" }
             $size = (Get-Item "$env:TEMP\innosetup.exe").Length
             if ($size -lt 5MB) { throw "Inno Setup download looks invalid (${size} bytes)" }
-            Start-Process -FilePath "$env:TEMP\innosetup.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait
+            # /DIR でインストール先を固定（既定の導入先はバージョンで異なるため）
+            $p = Start-Process -FilePath "$env:TEMP\innosetup.exe" `
+              -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/DIR=C:\InnoSetup') `
+              -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Inno Setup installer exit code: $($p.ExitCode)" }
           }
-          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found: $iscc" }
+          if (-not (Test-Path $iscc)) {
+            # 想定外の導入先でも探索
+            $iscc = Get-ChildItem 'C:\Program Files', 'C:\Program Files (x86)', "$env:LOCALAPPDATA\Programs" `
+                      -Directory -Filter 'Inno Setup*' -ErrorAction SilentlyContinue |
+                    ForEach-Object { Join-Path $_.FullName 'ISCC.exe' } |
+                    Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "ISCC.exe not found" }
           Write-Output "ISCC: $iscc"
+          Write-Output "ISCC_PATH=$iscc" >> $env:GITHUB_ENV
 
       - name: Build installer
         shell: pwsh
         run: |
-          & 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe' installer\installer.iss
+          & $env:ISCC_PATH installer\installer.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           Get-ChildItem dist | Select-Object Name, Length
 
