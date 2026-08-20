@@ -310,15 +310,20 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 
 ## 10. 公開・配布・リードジェン
 
-### 10.1 配布フロー
+### 10.1 配布フロー（GitHub Actions 自動リリース）
 
-1. Windows実機で §8 のテストチェックリストを通過
-2. `dist\ShineosLocalAI-Setup-<version>.exe` を GitHub Releases（または自社サイト）にアップロード
-3. Zenn記事の追記・ブログ（blog.shineos.com）で告知
-4. 配布ページに以下を明記:
-   - 無料であること・商用サポートの問い合わせ先（shineos.com）
-   - SmartScreenの回避手順（詳細情報→実行）
-   - 動作要件（Windows 10/11 64bit・8GB RAM以上・空き15GB・インストール時にネット接続）
+exe のビルドは **GitHub Actions が自動実行**する（`.github/workflows/release.yml`）:
+
+1. バージョンタグを push（例: `git tag v1.0.0 && git push origin v1.0.0`）
+2. ワークフローが Windows ランナーで Inno Setup 7 を導入 → `ISCC.exe installer\installer.iss` でビルド
+3. 成功すると **GitHub Releases に `ShineosLocalAI-Setup-<version>.exe` が自動添付**される
+
+手動ビルド（workflow_dispatch）でビルドのみ行いアーティファクト確認も可能。
+
+配布ページ（Releases）に以下を明記する:
+- 無料であること・商用サポートの問い合わせ先（https://shineos.com/contact/）
+- SmartScreenの回避手順（詳細情報→実行）
+- 動作要件（Windows 10/11 64bit・8GB RAM以上・空き15GB・インストール時にネット接続）
 
 ### 10.2 リードジェン導線（成功指標）
 
@@ -326,7 +331,7 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 |------|------|
 | 配布ページからの問い合わせ（メール/フォーム） | 導入者数に対し一定の転換（計測開始） |
 | 製造業向け（ZuMenGo）への引き込み | 「オフラインAI」文脈の相談を本ツールのFAQ・ブログから誘導 |
-| 開発受託の引き込み | 配布ページに「導入支援・カスタマイズは shineos.com まで」 |
+| 開発受託の引き込み | 配布ページに「導入支援・カスタマイズは https://shineos.com/contact/ まで」 |
 
 ### 10.3 計測
 

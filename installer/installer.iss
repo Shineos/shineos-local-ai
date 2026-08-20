@@ -26,7 +26,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}
+AppSupportURL=https://shineos.com/contact/
 DefaultDirName={autopf}\ShineosLocalAI
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
@@ -269,7 +269,7 @@ begin
        '・PCを再起動しても自動で起動します（Windowsサービス: ShineosLocalAI）' + #13#10 +
        '・アンインストール: 設定アプリ → アプリ → Shineos Local AI' + #13#10 +
        '・再インストールするとデータ（アップロードした文書など）は初期化されます' + #13#10 + #13#10 +
-       '不具合やご相談は https://shineos.com まで。' + #13#10;
+       '不具合やご相談は https://shineos.com/contact/ まで。' + #13#10;
   SaveStringToFile(ExpandConstant('{userdesktop}\ShineosLocalAI-はじめに.txt'), S, True);
 end;
 

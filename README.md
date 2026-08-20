@@ -21,6 +21,14 @@
 - 空き容量 15GB 以上
 - インストール時のみインターネット接続（モデル約3.4GBのダウンロードのため。所要約20〜50分）
 
+## ダウンロード
+
+[![Latest Release](https://img.shields.io/github/v/release/Shineos/shineos-local-ai)](https://github.com/Shineos/shineos-local-ai/releases)
+
+[Releases](https://github.com/Shineos/shineos-local-ai/releases) ページから最新の `ShineosLocalAI-Setup-<version>.exe` をダウンロードし、**ダブルクリックするだけでインストール**できます。
+
+※ 未署名のため初回は「WindowsによってPCが保護されました」と表示されます。「詳細情報」→「実行」をクリックしてください。
+
 ## 使い方
 
 1. `ShineosLocalAI-Setup-<version>.exe` をダブルクリック（管理者権限を要求されます）
@@ -63,5 +71,5 @@ Windows機で Inno Setup 7 を導入し:
 
 ## 問い合わせ
 
-- 不具合・導入支援・カスタマイズのご相談: https://shineos.com
+- 不具合・導入支援・カスタマイズのご相談: https://shineos.com/contact/
 - 本ツールは **無料** です。製造業向けオフラインAI（図面・マニュアル検索）のご相談もお気軽にどうぞ
