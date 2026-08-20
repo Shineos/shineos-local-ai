@@ -1,8 +1,13 @@
-# Shineos Local AI - 自動ビルド＆GitHub Releases 配布
+# Shineos Local AI - 自動ビルド・コード署名・GitHub Releases 配布
 #
-# - v* タグを push すると: Windows 上で Inno Setup ビルド → リリースに
-#   ShineosLocalAI-Setup-<version>.exe を自動添付
-# - workflow_dispatch で: ビルドのみ（アーティファクト確認用）
+# - v* タグを push すると: Windows 上で Inno Setup ビルド → SignPath でコード署名 →
+#   署名済み ShineosLocalAI-Setup-<version>.exe をリリースに自動添付
+# - workflow_dispatch で: ビルド・署名のみ（アーティファクト確認用）
+#
+# 必要な設定（リポジトリ Settings > Secrets and variables > Actions）:
+#   Secrets:  SIGNPATH_ORG_ID / SIGNPATH_API_TOKEN
+#   Variables: SIGNPATH_PROJECT_SLUG / SIGNPATH_SIGNING_POLICY_SLUG
+#             （SignPathコンソールで確認したスラッグに置き換えること）
 #
 # 注意: Inno Setup は 6.7.3（最終6系）を使用する。
 #   7系は API が変更され、かつ「Non-commercial use only」のため商用利用に
@@ -56,6 +61,44 @@ jobs:
         run: |
           & $env:ISCC_PATH installer\installer.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          Get-ChildItem dist | Select-Object Name, Length
+
+      # ---- SignPath コード署名 ----
+      - name: Upload unsigned artifact (for SignPath)
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-exe
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: Submit signing request to SignPath
+        id: sign
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          # artifact-configuration-slug: 未指定時はプロジェクトの既定を使用。
+          #   指定する場合: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 600
+          output-artifact-directory: signed
+          skip-decompress: true
+
+      - name: Replace unsigned exe with signed exe
+        shell: pwsh
+        run: |
+          $signed = Get-ChildItem signed -Recurse -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $signed) {
+            Write-Error "signed exe not found. signed/ の中身:"
+            Get-ChildItem signed -Recurse | Select-Object FullName, Length
+            throw "signed exe not found (アーカイブ返却の場合は skip-decompress を false に変更)"
+          }
+          $built = Get-ChildItem dist -Filter *.exe | Select-Object -First 1
+          Move-Item -Force $signed.FullName $built.FullName
           Get-ChildItem dist | Select-Object Name, Length
 
       - name: Upload artifact (manual build)

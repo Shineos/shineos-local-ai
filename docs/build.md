@@ -306,7 +306,7 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 
 | リスク | 内容 | 対策 |
 |--------|------|------|
-| SmartScreen警告 | 未署名exeは「保護されませんでした」表示が出る | README・配布ページに「詳細情報→実行」の案内を明記。実績ができたらコード署名を検討 |
+| SmartScreen警告 | 署名済み（SignPath）だが、新規証明書は初期段階で評判がなく警告が出る場合がある | README・配布ページに「発行元の確認→実行」の案内を維持 |
 | 8GB機の性能 | qwen3.5:4b は動作するがメモリ余裕が少なく応答が遅い | モデル選択ページ・ユーザーガイドで2b（軽量）への切替を案内。再インストールで変更可 |
 | WEBUI_AUTHの既知不具合 | ブラウザのCookie残存時にsignin APIが400になるケース（未解決） | 新規DB（毎回data初期化）＋シークレットウィンドウの案内をユーザーガイドに記載 |
 | Ollamaの自動起動 | 公式サービスの再起動時挙動は環境依存。フォールバック（ShineosOllama）を用意 | T3の再起動テストで確認。問題時は `sc start Ollama` |
@@ -331,8 +331,33 @@ exe のビルドは **GitHub Actions が自動実行**する（`.github/workflow
 
 配布ページ（Releases）に以下を明記する:
 - 無料であること・商用サポートの問い合わせ先（https://shineos.com/contact/）
-- SmartScreenの回避手順（詳細情報→実行）
 - 動作要件（Windows 10/11 64bit・8GB RAM以上・空き15GB・インストール時にネット接続）
+
+### 10.2 コード署名（SignPath.io）
+
+exe はビルド後に **SignPath.io でコード署名**され、署名済みファイルが Releases に公開される（`signpath/github-action-submit-signing-request@v2`）。
+
+**必要な設定**（リポジトリ Settings > Secrets and variables > Actions）:
+
+| 種別 | 名前 | 値 |
+|------|------|-----|
+| Secret | `SIGNPATH_ORG_ID` | SignPath 組織ID（例: `cf2997b6-...`） |
+| Secret | `SIGNPATH_API_TOKEN` | SignPath プロジェクトの API トークン |
+| Variable | `SIGNPATH_PROJECT_SLUG` | SignPath プロジェクトのスラッグ（要差し替え） |
+| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | 署名ポリシーのスラッグ（要差し替え） |
+
+**スラッグの確認方法**: SignPath コンソール（app.signpath.io）→ プロジェクトの設定画面にプロジェクトスラッグ、Signing Policies 画面にポリシースラッグが表示される。
+
+**署名フロー**（workflow 内）:
+1. `ISCC.exe` でビルド（未署名）
+2. `actions/upload-artifact` で署名対象をアップロード
+3. SignPath アクションが署名リクエストを送信 → 完了を待機（最大600秒）→ 署名済みexeを `signed/` に保存
+4. 署名済みexeで未署名exeを差し替え → GitHub Releases にアップロード
+
+**注意**:
+- `artifact-configuration-slug` 未指定時はプロジェクトの既定を使用。署名結果がアーカイブ（zip等）で返る場合は `skip-decompress: false` に変更すること
+- API トークンをチャット等で共有した場合は、SignPath コンソールで**ローテーション**を推奨
+- 署名ポリシーが手動承認設定の場合は `wait-for-completion-timeout-in-seconds`（600秒）を超えるとタイムアウトする
 
 ---
 

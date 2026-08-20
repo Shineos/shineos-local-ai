@@ -27,7 +27,7 @@
 
 [Releases](https://github.com/Shineos/shineos-local-ai/releases) ページから最新の `ShineosLocalAI-Setup-<version>.exe` をダウンロードし、**ダブルクリックするだけでインストール**できます。
 
-※ 未署名のため初回は「WindowsによってPCが保護されました」と表示されます。「詳細情報」→「実行」をクリックしてください。
+※ コード署名済み（SignPath）のため、通常は発行元が表示されそのまま実行できます。まれに「発行元の確認」が出る場合は「実行」を選択してください。
 
 ## 使い方
 
