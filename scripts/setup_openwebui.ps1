@@ -1,0 +1,75 @@
+﻿# setup_openwebui.ps1 - AIモデルのダウンロード / open-webui 実行環境の構築
+# モード:
+#   -Mode models : Ollama に LLM モデルと埋め込みモデルをダウンロード（長い処理）
+#   -Mode app    : venv 作成 → torch(CPU) → open-webui をインストール（長い処理）
+# 各処理は冪等（再実行時はスキップ）
+# 終了コード: 0 = 成功 / 非0 = 失敗
+param(
+    [string]$AppDir,
+    [string]$Mode,
+    [string]$Model = 'qwen3.5:4b',
+    [string]$EmbeddingModel = 'nomic-embed-text',
+    [string]$OpenWebuiVersion = '0.11.0'
+)
+
+$ErrorActionPreference = 'Stop'
+$LogFile = Join-Path $AppDir 'install.log'
+New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+function Log { param([string]$Message) "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8 }
+
+function Get-OllamaExe {
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
+        (Join-Path $env:ProgramFiles 'Ollama\ollama.exe')
+    )
+    foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
+    return $null
+}
+
+if ($Mode -eq 'models') {
+    # ---------- モデルダウンロード ----------
+    Log "--- models: $Model / $EmbeddingModel ---"
+    $ollama = Get-OllamaExe
+    if (-not $ollama) { throw 'ollama.exe not found' }
+    Log "pulling $Model"
+    & $ollama pull $Model
+    if ($LASTEXITCODE -ne 0) { throw "model pull failed: $Model" }
+    Log "pulling $EmbeddingModel"
+    & $ollama pull $EmbeddingModel
+    if ($LASTEXITCODE -ne 0) { throw "embedding model pull failed: $EmbeddingModel" }
+    Log 'models ready'
+}
+elseif ($Mode -eq 'app') {
+    # ---------- venv + torch(CPU) + open-webui ----------
+    Log '--- app install ---'
+    $pyExe = Join-Path $AppDir 'python\python.exe'
+    if (-not (Test-Path $pyExe)) { throw "python.exe not found: $pyExe" }
+
+    $venvDir = Join-Path $AppDir 'venv'
+    $venvPython = Join-Path $venvDir 'Scripts\python.exe'
+    if (-not (Test-Path $venvPython)) {
+        Log 'creating venv'
+        & $pyExe -m venv $venvDir
+        if ($LASTEXITCODE -ne 0) { throw 'venv creation failed' }
+    }
+
+    Log 'upgrading pip'
+    & $venvPython -m pip install --upgrade pip --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'pip upgrade failed' }
+
+    # torch は CPU 版を先に導入（Windows 既定の CUDA 版 2.5GB 超を回避）
+    Log 'installing torch (CPU)'
+    & $venvPython -m pip install torch --index-url https://download.pytorch.org/whl/cpu --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'torch install failed' }
+
+    Log "installing open-webui==$OpenWebuiVersion"
+    & $venvPython -m pip install "open-webui==$OpenWebuiVersion" --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'open-webui install failed' }
+
+    Log 'app install done'
+}
+else {
+    throw "unknown mode: $Mode"
+}
+
+exit 0

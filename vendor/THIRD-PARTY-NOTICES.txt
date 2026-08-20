@@ -1,0 +1,42 @@
+Shineos Local AI - Third Party Notices
+========================================
+
+本製品（インストーラ）は、以下のオープンソースコンポーネントを同梱・自動導入します。
+各コンポーネントのライセンス全文は、それぞれの配布元で確認できます。
+
+1. NSSM (nssm.exe)
+   - ライセンス: Public Domain
+   - 出典: https://nssm.cc/
+   - 用途: Windowsサービス管理（同梱）
+
+2. Ollama
+   - ライセンス: MIT License
+   - 出典: https://github.com/ollama/ollama
+   - 用途: ローカルLLM実行エンジン（インストール時に自動導入）
+
+3. Open WebUI
+   - ライセンス: BSD-3-Clause License
+   - 出典: https://github.com/open-webui/open-webui
+   - 用途: チャットUI・RAG・Web検索（pipで自動導入）
+
+4. Qwen3.5 (qwen3.5:4b / qwen3.5:2b)
+   - ライセンス: Apache License 2.0
+   - 出典: https://ollama.com/library/qwen3.5 / https://huggingface.co/Qwen
+   - 用途: LLMモデル（インストール時にダウンロード）
+
+5. nomic-embed-text
+   - ライセンス: Apache License 2.0
+   - 出典: https://ollama.com/library/nomic-embed-text
+   - 用途: RAG文書検索用の埋め込みモデル（インストール時にダウンロード）
+
+6. Python (3.12)
+   - ライセンス: Python Software Foundation License
+   - 出典: https://www.python.org/
+   - 用途: Open WebUI の実行環境（インストール時に自動導入）
+
+7. PyTorch (CPU版)
+   - ライセンス: BSD-3-Clause License
+   - 出典: https://pytorch.org/
+   - 用途: Open WebUI の依存（pipで自動導入）
+
+本製品のコード（Inno Setupスクリプト・PowerShell・バッチ等）は MIT License で提供します。

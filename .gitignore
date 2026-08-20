@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# ビルド出力（ISCC の OutputDir）
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# 実行時ログ
+*.log
