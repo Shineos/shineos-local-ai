@@ -1,7 +1,7 @@
 # Shineos Local AI — 無料インストーラツール 構築ドキュメント
 
 > 作成: 2026-08-20 | Shineos Inc.
-> ステータス: 実装完了（Windows実機検証は未実施 — §9 参照）
+> ステータス: 実装完了（Windows実機検証は未実施 — §8 参照）
 > 関連: [Zenn記事（ベースとなる技術構成）](https://zenn.dev/shineos/articles/local-llm-rag-web-search-with-ollama)
 
 ---
@@ -10,7 +10,7 @@
 
 Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカルRAG環境を、**技術者でない一般のWindowsユーザーでもダブルクリック一発で導入できる無料ツール**として公開する。
 
-**これは有料製品ではなく、問い合わせを増やすためのリードジェン装置である。** 収益の柱は自社のWeb/SaaS開発受託と製造業向けオフラインAI（ZuMenGo）であり、本ツールはその導入経路（フロントエンド）として機能させる。公開時に「無料」であること、問い合わせ導線（shineos.com）を明示することを徹底する。
+本ツールは**無料**で公開する。公開に際しては「無料であること」と問い合わせ先（https://shineos.com/contact/）を明示する。
 
 ### 製品の約束（ユーザーへの約束事）
 
@@ -212,11 +212,16 @@ shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-lo
 ### 7.1 バージョン更新（ユーザー向け）
 
 バージョンはインストーラの `AppVersion` と `OutputBaseFilename` で管理。配布時は GitHub Releases 等に
-`ShineosLocalAI-Setup-<version>.exe` をアップロードし、README・ユーザーガイドのリンクを更新する。
+### 7.1 バージョン更新（リリース手順）
+
+1. `installer.iss` の `#define MyAppVersion`（および `OutputBaseFilename`）を更新
+2. main に push し、`git tag v<新バージョン> && git push origin v<新バージョン>`
+3. GitHub Actions が自動ビルドし、GitHub Releases に `ShineosLocalAI-Setup-<version>.exe` を公開する（§10.1）
+4. README のバージョンバッジ（shields.io）は自動更新される。ユーザーガイドのバージョン表記は必要に応じて更新
 
 ### 7.2 open-webui バージョンの更新
 
-`installer.iss` の `#define OpenWebuiVersion` と `scripts\setup_openwebui.ps1` のピン留めを更新。
+`installer.iss` の `#define OpenWebuiVersion` を更新する（`setup_openwebui.ps1` は .iss から `-OpenWebuiVersion` 引数で受け取るため、.iss の更新で反映される。スクリプト内の既定値も念のため同期）。
 
 ```
 pip index versions open-webui   # 最新安定版の確認（要Windows/Python）
@@ -228,7 +233,7 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 
 ### 7.3 Python バージョンの更新
 
-`installer.iss` の `#define PythonVersion` と `setup_python.ps1` のURLを更新。python.org のアーカイブURL:
+`installer.iss` の `#define PythonVersion` を更新する（`setup_python.ps1` は `-Version` 引数で受け取る。スクリプト内の既定値も念のため同期）。python.org のアーカイブURL:
 `https://www.python.org/ftp/python/<version>/python-<version>-amd64.exe`
 
 ### 7.4 モデルの追加・変更
@@ -312,7 +317,7 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 
 ---
 
-## 10. 公開・配布・リードジェン
+## 10. 公開・配布
 
 ### 10.1 配布フロー（GitHub Actions 自動リリース）
 
@@ -328,19 +333,6 @@ exe のビルドは **GitHub Actions が自動実行**する（`.github/workflow
 - 無料であること・商用サポートの問い合わせ先（https://shineos.com/contact/）
 - SmartScreenの回避手順（詳細情報→実行）
 - 動作要件（Windows 10/11 64bit・8GB RAM以上・空き15GB・インストール時にネット接続）
-
-### 10.2 リードジェン導線（成功指標）
-
-| 指標 | 目標 |
-|------|------|
-| 配布ページからの問い合わせ（メール/フォーム） | 導入者数に対し一定の転換（計測開始） |
-| 製造業向け（ZuMenGo）への引き込み | 「オフラインAI」文脈の相談を本ツールのFAQ・ブログから誘導 |
-| 開発受託の引き込み | 配布ページに「導入支援・カスタマイズは https://shineos.com/contact/ まで」 |
-
-### 10.3 計測
-
-- 配布ページにアクセス解析・問い合わせフォームを設置
-- インストール完了画面の「はじめに.txt」に問い合わせ先を記載（実装済み）
 
 ---
 

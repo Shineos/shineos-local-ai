@@ -23,7 +23,7 @@
 
 ## ダウンロード
 
-[![Latest Release](https://img.shields.io/github/v/release/Shineos/shineos-local-ai)](https://github.com/Shineos/shineos-local-ai/releases)
+[![Latest Release](https://img.shields.io/github/v/release/Shineos/shineos-local-ai?sort=semver&label=Latest%20Release)](https://github.com/Shineos/shineos-local-ai/releases/latest)
 
 [Releases](https://github.com/Shineos/shineos-local-ai/releases) ページから最新の `ShineosLocalAI-Setup-<version>.exe` をダウンロードし、**ダブルクリックするだけでインストール**できます。
 
@@ -46,7 +46,7 @@
 
 ```
 shineos-local-ai/
-├── installer/installer.iss   # Inno Setup 7 インストーラスクリプト
+├── installer/installer.iss   # Inno Setup 6.7.3 インストーラスクリプト
 ├── scripts/                  # セットアップ用 PowerShell / バッチ
 ├── assets/app.ico            # アイコン
 ├── vendor/                   # nssm.exe・サードパーティライセンス
@@ -55,13 +55,15 @@ shineos-local-ai/
 
 ## ビルド
 
-Windows機で Inno Setup 7 を導入し:
+Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し:
 
 ```
-"C:\Program Files (x86)\Inno Setup 7\ISCC.exe" installer\installer.iss
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\installer.iss
 ```
 
 出力: `dist\ShineosLocalAI-Setup-<version>.exe`
+
+※ 通常は GitHub Actions が自動ビルドして GitHub Releases に公開します（`v*` タグの push で発火）。
 
 ビルド・テスト・更新手順の詳細は [構築ドキュメント](docs/build.md) を参照してください。
 
