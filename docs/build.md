@@ -343,8 +343,15 @@ exe はビルド後に **SignPath.io でコード署名**され、署名済み�
 |------|------|-----|
 | Secret | `SIGNPATH_ORG_ID` | SignPath 組織ID（例: `cf2997b6-...`） |
 | Secret | `SIGNPATH_API_TOKEN` | SignPath プロジェクトの API トークン |
-| Variable | `SIGNPATH_PROJECT_SLUG` | SignPath プロジェクトのスラッグ（要差し替え） |
-| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | 署名ポリシーのスラッグ（要差し替え） |
+| Variable | `SIGNPATH_PROJECT_SLUG` | `shineos-local-ai`（APIで作成済み・設定済み） |
+| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | 署名ポリシーのスラッグ（コンソールで作成後に設定） |
+
+**SignPath側の設定状況（2026-08-20）**:
+- プロジェクト `Shineos Local AI`（slug: `shineos-local-ai`）は API で作成済み
+- アーティファクト設定 `initial`（既定・有効）: `ShineosLocalAI-Setup-*.exe` を Authenticode 署名
+- **証明書と署名ポリシーは SignPath コンソールでのみ作成可能**（API未公開のため）。
+  コンソールで「Certificates → 自己署名テスト証明書の作成」→「Project → Signing Policies → 追加（証明書とSubmitterを選択）」を行い、
+  GitHub の Variable `SIGNPATH_SIGNING_POLICY_SLUG` にポリシースラッグ（例: `test-signing`）を設定する
 
 **スラッグの確認方法**: SignPath コンソール（app.signpath.io）→ プロジェクトの設定画面にプロジェクトスラッグ、Signing Policies 画面にポリシースラッグが表示される。
 
