@@ -25,8 +25,11 @@ jobs:
         run: |
           $iscc = 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
           if (-not (Test-Path $iscc)) {
-            curl.exe -L --fail --retry 3 -o "$env:TEMP\innosetup.exe" https://jrsoftware.org/download.php/is.exe
+            # 公式GitHubリリースから直接取得（download.php はスタブHTMLを返すため不使用）
+            curl.exe -L --fail --retry 3 -o "$env:TEMP\innosetup.exe" https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup download failed" }
+            $size = (Get-Item "$env:TEMP\innosetup.exe").Length
+            if ($size -lt 5MB) { throw "Inno Setup download looks invalid (${size} bytes)" }
             Start-Process -FilePath "$env:TEMP\innosetup.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait
           }
           if (-not (Test-Path $iscc)) { throw "ISCC.exe not found: $iscc" }
