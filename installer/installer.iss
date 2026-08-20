@@ -149,10 +149,8 @@ begin
     'インストールするAIモデルを選択してください',
     '検出メモリ: ' + IntToStr(RamGB) + ' GB。動作が重い場合は「軽量」を選択してください。',
     True, False);
-  ModelPage.Add('qwen3.5:4b（推奨）',
-    '性能重視。8GB機でも動作し、16GB以上で快適。ダウンロード約3.4GB');
-  ModelPage.Add('qwen3.5:2b（軽量）',
-    '動作が軽く、8GB機に最適。ダウンロード約2.7GB');
+  ModelPage.Add('qwen3.5:4b（推奨）　性能重視・16GB以上で快適・約3.4GB');
+  ModelPage.Add('qwen3.5:2b（軽量）　8GB機に最適・約2.7GB');
   ModelPage.SelectedValueIndex := 0;
 end;
 
@@ -164,7 +162,7 @@ var
 begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
-    'Shineos Local AI のセットアップを実行しています。',
+    'Shineos Local AI のセットアップを実行しています。' + #13#10 +
     '完了まで約20〜50分かかります（AIモデルのダウンロードを含みます）。' + #13#10 +
     'インストール中はウィンドウを閉じないでください。');
   try
@@ -284,7 +282,7 @@ begin
     AppDir := ExpandConstant('{app}');
     Ready := False;
     ProgressPage := CreateOutputProgressPage('仕上げ',
-      'サービスを登録して起動しています...', '');
+      'サービスを登録して起動しています...');
     try
       ProgressPage.Show;
 
