@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -183,7 +183,7 @@ begin
     end;
 
     ProgressPage.SetProgress(5, 100);
-    ProgressPage.SetText('Python 3.12 をインストール中...', '約2分');
+    ProgressPage.SetText('Python 3.12 をインストール中...', '古いPythonの登録があれば自動でアンインストールしてから導入します（約2〜5分）');
     if not RunPowerShell('setup_python.ps1',
         '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '" -Version "{#PythonVersion}"', RC)
        or (RC <> 0) then
