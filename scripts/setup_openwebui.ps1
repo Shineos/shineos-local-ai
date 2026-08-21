@@ -44,6 +44,12 @@ elseif ($Mode -eq 'app') {
     # ---------- venv + torch(CPU) + open-webui ----------
     Log '--- app install ---'
     $pyExe = Join-Path $AppDir 'python\python.exe'
+    # setup_python.ps1 が既存Pythonを再利用した場合は python-path.txt に実パスが記録される
+    $pathFile = Join-Path $AppDir 'python-path.txt'
+    if (Test-Path $pathFile) {
+        $candidate = (Get-Content $pathFile -Raw).Trim()
+        if ($candidate -and (Test-Path $candidate)) { $pyExe = $candidate }
+    }
     if (-not (Test-Path $pyExe)) { throw "python.exe not found: $pyExe" }
 
     $venvDir = Join-Path $AppDir 'venv'
