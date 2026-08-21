@@ -50,7 +50,13 @@ function Invoke-Step {
     )
     Log-Console "===== STEP START: $Name ====="
     $outFile = Join-Path $TmpDir 'step_output.txt'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here $Script) @Params 2>&1 | Tee-Object -FilePath $outFile
+    # PS 5.1 は配列引数をネイティブコマンドに渡す際、空白を含むパスを
+    # 「C:\Program」のように途中で切ってしまう（= 根本原因）。
+    # cmd /c でコマンドライン文字列を組み立て、引用符を確実に保持する
+    $childPath = Join-Path $here $Script
+    $cmdLine = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $childPath + '"'
+    foreach ($p in $Params) { $cmdLine += ' "' + $p + '"' }
+    & cmd.exe /d /c $cmdLine 2>&1 | Tee-Object -FilePath $outFile
     $code = $LASTEXITCODE
     if ($code -ne 0) {
         Log-Console "===== STEP FAILED: $Name (exit $code) ====="
