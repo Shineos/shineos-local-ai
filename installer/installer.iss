@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.24"
+#define MyAppVersion "1.0.25"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -85,6 +85,7 @@ var
   PortFree: Boolean;
   OsOk: Boolean;
   SelectedModel: String;
+  UninstallRemoveOllama: Boolean;
 
 const
   PREFLIGHT_INI = 'preflight.ini';
@@ -315,6 +316,49 @@ end;
 
 { ---------- アンインストール ---------- }
 
+{ アンインストール開始時に「Ollama・モデルも削除するか」を確認する }
+function InitializeUninstall: Boolean;
+begin
+  Result := True;
+  UninstallRemoveOllama := False;
+  if not UninstallSilent then
+    UninstallRemoveOllama := MsgBox(
+      'Ollama（LLM実行エンジン）とダウンロード済みAIモデル（約3.2GB）も削除しますか？' + #13#10 + #13#10 +
+      '「はい」: Ollama本体・AIモデル・関連サービスをすべて削除します。' + #13#10 +
+      '　　　　 再インストール時はOllamaとモデルの再ダウンロード（約2時間）が必要です。' + #13#10 +
+      '「いいえ」: Shineos Local AI のファイルとサービスだけを削除し、Ollama は残します。',
+      mbConfirmation, MB_YESNO) = IDYES;
+end;
+
+{ Ollama 本体・モデル・サービスを完全削除する }
+procedure RemoveOllamaCompletely;
+var
+  RC: Integer;
+  OllamaUnins: String;
+begin
+  { 実行中のプロセスを停止（直接起動・トレイアプリ） }
+  Exec('taskkill.exe', '/IM ollama.exe /F', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec('taskkill.exe', '/IM "ollama app.exe" /F', '', SW_HIDE, ewWaitUntilTerminated, RC);
+
+  { 公式サービスとフォールバックサービスを停止・削除 }
+  Exec(ExpandConstant('{sys}\sc.exe'), 'stop Ollama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'delete Ollama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'stop ShineosOllama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'delete ShineosOllama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+
+  { 公式アンインストーラで Ollama 本体を削除（Inno製のため unins000.exe が存在する） }
+  OllamaUnins := ExpandConstant('{localappdata}\Programs\Ollama\unins000.exe');
+  if FileExists(OllamaUnins) then
+  begin
+    Exec(OllamaUnins, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, RC);
+  end;
+
+  { 残ったモデル・データ・プログラムを確実に削除 }
+  DelTree(ExpandConstant('{userprofile}\.ollama'), True, True, True);
+  DelTree(ExpandConstant('{localappdata}\Programs\Ollama'), True, True, True);
+  DelTree(ExpandConstant('{appdata}\Ollama'), True, True, True);
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   RC: Integer;
@@ -324,8 +368,13 @@ begin
     { サービス停止 → 削除（ファイル削除前に実行される） }
     Exec(ExpandConstant('{sys}\sc.exe'), 'stop ShineosLocalAI', '', SW_HIDE, ewWaitUntilTerminated, RC);
     Exec(ExpandConstant('{sys}\sc.exe'), 'delete ShineosLocalAI', '', SW_HIDE, ewWaitUntilTerminated, RC);
-    { Ollama のサービス不在時に登録したフォールバックサービスの削除 }
-    Exec(ExpandConstant('{sys}\sc.exe'), 'stop ShineosOllama', '', SW_HIDE, ewWaitUntilTerminated, RC);
-    Exec(ExpandConstant('{sys}\sc.exe'), 'delete ShineosOllama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    if UninstallRemoveOllama then
+      RemoveOllamaCompletely
+    else
+    begin
+      { Ollama を残す場合はフォールバックサービスのみ削除 }
+      Exec(ExpandConstant('{sys}\sc.exe'), 'stop ShineosOllama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+      Exec(ExpandConstant('{sys}\sc.exe'), 'delete ShineosOllama', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    end;
   end;
 end;
