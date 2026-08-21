@@ -5,7 +5,8 @@
 # 終了コード: 0 = 成功 / 非0 = 失敗
 param(
     [string]$AppDir,
-    [int]$Port = 8080
+    [int]$Port = 8080,
+    [string]$Model = 'qwen3.5:4b'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,6 +56,7 @@ $envs = @(
     '"WEBUI_AUTH=False"',
     '"ENABLE_SIGNUP=False"',
     '"OLLAMA_BASE_URL=http://127.0.0.1:11434"',
+    '("DEFAULT_MODELS=' + $Model + '")',
     '"RAG_EMBEDDING_ENGINE=ollama"',
     '"RAG_EMBEDDING_MODEL=nomic-embed-text"',
     '"ENABLE_WEB_SEARCH=True"',

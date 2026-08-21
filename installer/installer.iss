@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.14"
+#define MyAppVersion "1.0.15"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -341,7 +341,7 @@ begin
       ProgressPage.Show;
 
       ProgressPage.SetText('Windowsサービスを登録中...', '');
-      Ready := RunPowerShell('register_service.ps1', '-AppDir "' + AppDir + '"', RC) and (RC = 0);
+      Ready := RunPowerShell('register_service.ps1', '-AppDir "' + AppDir + '" -Model "' + SelectedModel + '"', RC) and (RC = 0);
       if not Ready then
       begin
         MsgBox('サービスの登録に失敗しました。' + #13#10 +
