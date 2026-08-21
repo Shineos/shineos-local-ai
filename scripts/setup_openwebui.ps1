@@ -49,7 +49,7 @@ if ($Mode -eq 'models') {
     $ErrorActionPreference = 'Continue'
     $pullOut = & $ollama pull $Model 2>&1 | ForEach-Object { Progress $_; $_ }
     $pullCode = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop
+    $ErrorActionPreference = 'Stop'
     if ($pullCode -ne 0) {
         $pullOut | ForEach-Object { Log "ollama-pull: $_" }
         $errLog = Join-Path $AppDir 'logs\ollama.err.log'
@@ -67,7 +67,7 @@ if ($Mode -eq 'models') {
     $ErrorActionPreference = 'Continue'
     $pullOut2 = & $ollama pull $EmbeddingModel 2>&1 | ForEach-Object { Progress $_; $_ }
     $pullCode2 = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop
+    $ErrorActionPreference = 'Stop'
     if ($pullCode2 -ne 0) {
         $pullOut2 | ForEach-Object { Log "ollama-pull: $_" }
         throw "embedding model pull failed: $EmbeddingModel (exit $pullCode2)"
