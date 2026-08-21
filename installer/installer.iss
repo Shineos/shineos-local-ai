@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.26"
+#define MyAppVersion "1.0.27"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -63,9 +63,11 @@ Source: "..\vendor\nssm.exe";              DestDir: "{app}\tools"; Flags: ignore
 Source: "..\scripts\start_openwebui.bat";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\assets\app.ico";               DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\vendor\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}";     Flags: ignoreversion
+; WebView2 ラッパーアプリ（URL入力不要・閉じたらサービス停止）
+Source: "..\dist\ShineosLocalAI.App\*";    DestDir: "{app}\app";   Flags: ignoreversion recursesubdirs
 
 [Icons]
-Name: "{autodesktop}\{#MyAppName}"; Filename: "http://localhost:{#Port}"; IconFilename: "{app}\assets\app.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\app\ShineosLocalAI.exe"; IconFilename: "{app}\assets\app.ico"
 
 ; --- アンインストール時の完全削除 --------------------------------------------
 [UninstallDelete]
@@ -74,6 +76,7 @@ Type: filesandordirs; Name: "{app}\venv"
 Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\tools"
+Type: filesandordirs; Name: "{app}\app"
 Type: files; Name: "{app}\install.log"
 Type: files; Name: "{userdesktop}\ShineosLocalAI-はじめに.txt"
 
@@ -159,12 +162,13 @@ begin
   ModelPage := CreateInputOptionPage(wpSelectDir,
     'AIモデルの選択',
     'インストールするAIモデルを選択してください',
-    '検出メモリ: ' + IntToStr(RamGB) + ' GB。CPU専用PC向けに最適化した日本語モデルです。' + #13#10 +
-    '業務利用の標準は「3b（推奨）」、1.5bは補助（軽量・速度優先）向けです。' + #13#10 +
-    '動作が重い場合は「軽量」を選択してください。',
+    '検出メモリ: ' + IntToStr(RamGB) + ' GB。日本語業務向けモデルです。' + #13#10 +
+    '業務利用の標準は「7b（推奨）」、3bは標準・高速、1.5bは補助（軽量・速度優先）向けです。' + #13#10 +
+    '動作が重い場合は下の「軽量」を選択してください。',
     True, False);
-  ModelPage.Add('qwen2.5:3b（推奨）　業務利用の標準・高速・約1.9GB');
-  ModelPage.Add('qwen2.5:1.5b（軽量）　補助向け・8GB機に最適・約1GB');
+  ModelPage.Add('qwen2.5:7b（推奨）　業務向け・日本語品質が最も高い・約4.7GB・応答10〜15秒');
+  ModelPage.Add('qwen2.5:3b（標準）　バランス・高速・約1.9GB・応答1〜3秒');
+  ModelPage.Add('qwen2.5:1.5b（軽量）　補助向け・8GB機に最適・約1GB・応答1秒未満');
   ModelPage.SelectedValueIndex := 0;
 end;
 
@@ -240,9 +244,11 @@ begin
       Exit;
     end;
     if ModelPage.SelectedValueIndex = 1 then
+      SelectedModel := 'qwen2.5:3b'
+    else if ModelPage.SelectedValueIndex = 2 then
       SelectedModel := 'qwen2.5:1.5b'
     else
-      SelectedModel := 'qwen2.5:3b';
+      SelectedModel := 'qwen2.5:7b';
     Result := RunLongSteps(AppDir);
   end;
 end;
@@ -261,6 +267,9 @@ begin
        '・Web検索: チャット入力欄のWeb検索ボタンをONにすると利用できます（DuckDuckGo・APIキー不要）' + #13#10 +
        '・完全オフライン: Web検索ボタンをOFFのままにすれば、一切インターネットに接続しません' + #13#10 + #13#10 +
        '・PCを再起動しても自動で起動します（Windowsサービス: ShineosLocalAI）' + #13#10 +
+       '・デスクトップの「Shineos Local AI」を開くとアプリ画面でチャットできます（URL入力不要）' + #13#10 +
+       '・アプリを閉じるとサービスも停止します（再起動後は自動で再開）' + #13#10 +
+       '・ブラウザで使いたい場合は http://localhost:8080 を開いてください' + #13#10 +
        '・アンインストール: 設定アプリ → アプリ → Shineos Local AI' + #13#10 +
        '・再インストールするとデータ（アップロードした文書など）は初期化されます' + #13#10 + #13#10 +
        '不具合やご相談は https://shineos.com/contact/ まで。' + #13#10;
@@ -302,10 +311,16 @@ begin
       end;
 
       WriteUsageFile(AppDir);
+
+      { 一般ユーザーでもサービスを開始・停止できるように DACL を設定 }
+      { （WebView2ラッパーアプリがUACなしで start/stop するために必要） }
+      ProgressPage.SetText('サービスをユーザー操作可能に設定中...', '');
+      Exec('sc.exe', 'sdset ShineosLocalAI "D:(A;;0x34;;;AU)(A;;GA;;;SY)(A;;GA;;;BA)"', '', SW_HIDE, ewWaitUntilTerminated, RC);
+
       WizardForm.FinishedLabel.Caption :=
         'インストールが完了しました。' + #13#10 + #13#10 +
-        'デスクトップの「Shineos Local AI」をダブルクリックするか、' + #13#10 +
-        'ブラウザで http://localhost:{#Port} を開いてください。ログインは不要です。' + #13#10 + #13#10 +
+        'デスクトップの「Shineos Local AI」をダブルクリックすると、アプリ画面が開きます（URL入力不要）。' + #13#10 +
+        'アプリを閉じるとサービスも停止します。' + #13#10 + #13#10 +
         '詳しい使い方はデスクトップの「ShineosLocalAI-はじめに.txt」を参照してください。';
     finally
       ProgressPage.Hide;

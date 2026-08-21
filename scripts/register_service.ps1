@@ -6,7 +6,7 @@
 param(
     [string]$AppDir,
     [int]$Port = 8080,
-    [string]$Model = 'qwen2.5:3b'
+    [string]$Model = 'qwen2.5:7b'
 )
 
 $ErrorActionPreference = 'Stop'

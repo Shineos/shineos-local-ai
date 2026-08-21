@@ -7,7 +7,7 @@
 param(
     [string]$AppDir,
     [string]$Mode,
-    [string]$Model = 'qwen2.5:3b',
+    [string]$Model = 'qwen2.5:7b',
     [string]$EmbeddingModel = 'nomic-embed-text',
     [string]$OpenWebuiVersion = '0.11.0',
     [string]$ProgressFile = ''

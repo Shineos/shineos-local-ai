@@ -39,4 +39,9 @@ Shineos Local AI - Third Party Notices
    - 出典: https://pytorch.org/
    - 用途: Open WebUI の依存（pipで自動導入）
 
-本製品のコード（Inno Setupスクリプト・PowerShell・バッチ等）は MIT License で提供します。
+8. Microsoft.Web.WebView2 SDK (1.0.4129)
+   - ライセンス: Microsoft Software License Terms（WebView2 SDK）
+   - 出典: https://www.nuget.org/packages/Microsoft.Web.WebView2
+   - 用途: デスクトップアプリ「Shineos Local AI」の画面表示（同梱）
+
+本製品のコード（Inno Setupスクリプト・PowerShell・バッチ・C#）は MIT License で提供します。
