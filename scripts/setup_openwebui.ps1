@@ -93,18 +93,18 @@ elseif ($Mode -eq 'app') {
 
     Log 'upgrading pip'
     Progress 'upgrading pip...'
-    & $venvPython -m pip install --upgrade pip --quiet
+    & $venvPython -m pip install --upgrade pip
     if ($LASTEXITCODE -ne 0) { throw 'pip upgrade failed' }
 
     # torch は CPU 版を先に導入（Windows 既定の CUDA 版 2.5GB 超を回避）
     Log 'installing torch (CPU)'
     Progress 'installing torch (CPU)...'
-    & $venvPython -m pip install torch --index-url https://download.pytorch.org/whl/cpu --quiet
+    & $venvPython -m pip install torch --index-url https://download.pytorch.org/whl/cpu
     if ($LASTEXITCODE -ne 0) { throw 'torch install failed' }
 
     Log "installing open-webui==$OpenWebuiVersion"
     Progress 'installing open-webui...'
-    & $venvPython -m pip install "open-webui==$OpenWebuiVersion" --quiet
+    & $venvPython -m pip install "open-webui==$OpenWebuiVersion"
     if ($LASTEXITCODE -ne 0) { throw 'open-webui install failed' }
 
     Log 'app install done'

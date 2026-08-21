@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.11"
+#define MyAppVersion "1.0.12"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -129,49 +129,12 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
-// PowerShell を非同期起動し、進捗ファイル（{tmp} の progress.txt）をポーリングして
-// 最終行を進捗ページにリアルタイム表示する。
-// スクリプト側が最後に「PROGRESS_DONE:<exit code>」を書いて完了を知らせる
-function RunStepLive(StepTitle, Script, Params, ProgressFile: String; var ResultCode: Integer): Boolean;
-var
-  Content: AnsiString;  // LoadStringFromFile は AnsiString が必須
-  LastLine: String;
-  P: Integer;
-  Done: Boolean;
+{ 長いステップ用: PowerShellをコンソール表示で実行し、ライブログを確認できるようにする }
+function RunPowerShellVisible(Script, Params: String; var ResultCode: Integer): Boolean;
 begin
-  Result := False;
-  ResultCode := 1;
-  Done := False;
-  SaveStringToFile(ProgressFile, '', False);
-  if not ShellExec('open', 'powershell.exe',
-      '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\' + Script) + '" ' + Params,
-      '', SW_HIDE, ewNoWait, ResultCode) then
-    Exit;
-  while not Done do
-  begin
-    Sleep(400);
-    if LoadStringFromFile(ProgressFile, Content) then
-    begin
-      { 最終行を取り出す }
-      P := Length(Content);
-      while (P > 0) and (Content[P] <> #10) do
-        Dec(P);
-      if P > 0 then
-        LastLine := Copy(Content, P + 1, Length(Content) - P)
-      else
-        LastLine := Content;
-      if (Length(LastLine) > 0) and (LastLine[Length(LastLine)] = #13) then
-        Delete(LastLine, Length(LastLine), 1);
-      if Pos('PROGRESS_DONE:', LastLine) = 1 then
-      begin
-        ResultCode := StrToIntDef(Copy(LastLine, 14, Length(LastLine) - 13), 1);
-        Result := (ResultCode = 0);
-        Done := True;
-      end
-      else if LastLine <> '' then
-        ProgressPage.SetText(StepTitle, LastLine);
-    end;
-  end;
+  Result := Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\' + Script) + '" ' + Params,
+    '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode);
 end;
 
 { ---------- ウィザード初期化 ---------- }
@@ -228,11 +191,9 @@ begin
     end;
 
     ProgressPage.SetProgress(5, 100);
-    ProgressPage.SetText('Python 3.12 をインストール中...', '古いPythonの登録があれば自動でアンインストールしてから導入します（約2〜5分）');
-    if not RunStepLive('Python 3.12 をインストール中...',
-        'setup_python.ps1',
-        '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '" -Version "{#PythonVersion}" -ProgressFile "' + ExpandConstant('{tmp}\progress.txt') + '"',
-        ExpandConstant('{tmp}\progress.txt'), RC)
+    ProgressPage.SetText('Python 3.12 をインストール中...', '古いPythonの登録があれば自動でアンインストールしてから導入します（約2〜5分・詳細はログウィンドウに表示）');
+    if not RunPowerShellVisible('setup_python.ps1',
+        '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '" -Version "{#PythonVersion}"', RC)
        or (RC <> 0) then
     begin
       MsgBox('Python のインストールに失敗しました。' + #13#10 +
@@ -241,11 +202,9 @@ begin
     end;
 
     ProgressPage.SetProgress(20, 100);
-    ProgressPage.SetText('Ollama（AI実行エンジン）をインストール中...', '古いバージョンがあれば最新に更新します（本体1.5GBのダウンロードのため10〜40分）');
-    if not RunStepLive('Ollama（AI実行エンジン）をインストール中...',
-        'setup_ollama.ps1',
-        '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '" -ProgressFile "' + ExpandConstant('{tmp}\progress.txt') + '"',
-        ExpandConstant('{tmp}\progress.txt'), RC)
+    ProgressPage.SetText('Ollama（AI実行エンジン）をインストール中...', '古いバージョンがあれば最新に更新します（本体1.5GBのダウンロード・詳細はログウィンドウに表示）');
+    if not RunPowerShellVisible('setup_ollama.ps1',
+        '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '"', RC)
        or (RC <> 0) then
     begin
       MsgBox('Ollama のインストールに失敗しました。' + #13#10 +
@@ -254,11 +213,9 @@ begin
     end;
 
     ProgressPage.SetProgress(45, 100);
-    ProgressPage.SetText('AIモデルをダウンロード中（' + SelectedModel + '）...', '約3.7GB・回線により10〜60分');
-    if not RunStepLive('AIモデルをダウンロード中（' + SelectedModel + '）...',
-        'setup_openwebui.ps1',
-        '-AppDir "' + AppDir + '" -Mode models -Model "' + SelectedModel + '" -ProgressFile "' + ExpandConstant('{tmp}\progress.txt') + '"',
-        ExpandConstant('{tmp}\progress.txt'), RC)
+    ProgressPage.SetText('AIモデルをダウンロード中（' + SelectedModel + '）...', '約3.7GB・回線により10〜60分（進捗はログウィンドウに表示）');
+    if not RunPowerShellVisible('setup_openwebui.ps1',
+        '-AppDir "' + AppDir + '" -Mode models -Model "' + SelectedModel + '"', RC)
        or (RC <> 0) then
     begin
       MsgBox('AIモデルのダウンロードに失敗しました。' + #13#10 +
@@ -268,11 +225,9 @@ begin
     end;
 
     ProgressPage.SetProgress(75, 100);
-    ProgressPage.SetText('Open WebUI（チャットアプリ）をインストール中...', '約5〜15分');
-    if not RunStepLive('Open WebUI（チャットアプリ）をインストール中...',
-        'setup_openwebui.ps1',
-        '-AppDir "' + AppDir + '" -Mode app -OpenWebuiVersion "{#OpenWebuiVersion}" -ProgressFile "' + ExpandConstant('{tmp}\progress.txt') + '"',
-        ExpandConstant('{tmp}\progress.txt'), RC)
+    ProgressPage.SetText('Open WebUI（チャットアプリ）をインストール中...', '約5〜15分（詳細はログウィンドウに表示）');
+    if not RunPowerShellVisible('setup_openwebui.ps1',
+        '-AppDir "' + AppDir + '" -Mode app -OpenWebuiVersion "{#OpenWebuiVersion}"', RC)
        or (RC <> 0) then
     begin
       MsgBox('Open WebUI のインストールに失敗しました。' + #13#10 +
