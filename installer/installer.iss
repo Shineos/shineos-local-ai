@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.27"
+#define MyAppVersion "1.0.28"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -88,6 +88,7 @@ var
   PortFree: Boolean;
   OsOk: Boolean;
   SelectedModel: String;
+  SelectedPort: Integer;
   UninstallRemoveOllama: Boolean;
 
 const
@@ -107,7 +108,7 @@ begin
   ExtractTemporaryFile('nssm.exe');
 end;
 
-{ preflight.ps1 を実行し、結果（OS・ポート8080・RAM）を読み取る }
+{ preflight.ps1 を実行し、結果（OS・空きポート・RAM）を読み取る }
 procedure RunPreflight;
 var
   RC: Integer;
@@ -116,6 +117,7 @@ begin
   PortFree := True;
   OsOk := True;
   RamGB := 8;
+  SelectedPort := {#Port};
   Ini := ExpandConstant('{tmp}\' + PREFLIGHT_INI);
   if Exec('powershell.exe',
       '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\preflight.ps1') + '" -IniPath "' + Ini + '"',
@@ -123,6 +125,7 @@ begin
   begin
     OsOk := (GetIniString('preflight', 'os_ok', 'no', Ini) = 'yes');
     PortFree := (GetIniString('preflight', 'port_8080_free', 'no', Ini) = 'yes');
+    SelectedPort := GetIniInt('preflight', 'port', {#Port}, 8080, 65535, Ini);
     RamGB := GetIniInt('preflight', 'ram_gb', 8, 4, 512, Ini);
   end;
 end;
@@ -156,13 +159,12 @@ begin
            'インストールを中止してください。', mbError, MB_OK);
 
   if not PortFree then
-    MsgBox('ポート 8080 が他のプログラムで使用されています。' + #13#10 +
-           '該当プログラムを終了してからインストールをやり直してください。', mbError, MB_OK);
+    MsgBox('ポート 8080 が使用中のため、8081 以降の空きポート（' + IntToStr(SelectedPort) + '）でインストールします。', mbInformation, MB_OK);
 
   ModelPage := CreateInputOptionPage(wpSelectDir,
     'AIモデルの選択',
     'インストールするAIモデルを選択してください',
-    '検出メモリ: ' + IntToStr(RamGB) + ' GB。日本語業務向けモデルです。' + #13#10 +
+    '検出メモリ: ' + IntToStr(RamGB) + ' GB。使用ポート: ' + IntToStr(SelectedPort) + '（8080 が空いていれば 8080）。日本語業務向けモデルです。' + #13#10 +
     '業務利用の標準は「7b（推奨）」、3bは標準・高速、1.5bは補助（軽量・速度優先）向けです。' + #13#10 +
     '動作が重い場合は下の「軽量」を選択してください。',
     True, False);
@@ -196,8 +198,8 @@ begin
     end;
     if not PortFree then
     begin
-      MsgBox('ポート 8080 が使用中のため続行できません。' + #13#10 +
-             '該当プログラムを終了してから「次へ」をもう一度押してください。', mbError, MB_OK);
+      MsgBox('ポート 8080〜8099 がすべて使用中のため続行できません。' + #13#10 +
+             'いずれかのプログラムを終了してから「次へ」をもう一度押してください。', mbError, MB_OK);
       Exit;
     end;
 
@@ -261,7 +263,7 @@ var
 begin
   S := 'Shineos Local AI - はじめに' + #13#10 +
        '=====================================' + #13#10 + #13#10 +
-       'ブラウザで http://localhost:{#Port} を開くと、そのままチャットを始められます（ログイン不要・初期設定なし）。' + #13#10 + #13#10 +
+       'ブラウザで http://localhost:' + IntToStr(SelectedPort) + ' を開くと、そのままチャットを始められます（ログイン不要・初期設定なし）。' + #13#10 + #13#10 +
        '・使用モデル: ' + SelectedModel + '（文書検索用: nomic-embed-text）' + #13#10 +
        '・RAG（文書の質問）: チャット画面の「+」→ ファイルアップロード → その内容について質問' + #13#10 +
        '・Web検索: チャット入力欄のWeb検索ボタンをONにすると利用できます（DuckDuckGo・APIキー不要）' + #13#10 +
@@ -269,7 +271,7 @@ begin
        '・PCを再起動しても自動で起動します（Windowsサービス: ShineosLocalAI）' + #13#10 +
        '・デスクトップの「Shineos Local AI」を開くとアプリ画面でチャットできます（URL入力不要）' + #13#10 +
        '・アプリを閉じるとサービスも停止します（再起動後は自動で再開）' + #13#10 +
-       '・ブラウザで使いたい場合は http://localhost:8080 を開いてください' + #13#10 +
+       '・ブラウザで使いたい場合は http://localhost:' + IntToStr(SelectedPort) + ' を開いてください' + #13#10 +
        '・アンインストール: 設定アプリ → アプリ → Shineos Local AI' + #13#10 +
        '・再インストールするとデータ（アップロードした文書など）は初期化されます' + #13#10 + #13#10 +
        '不具合やご相談は https://shineos.com/contact/ まで。' + #13#10;
@@ -292,7 +294,7 @@ begin
       ProgressPage.Show;
 
       ProgressPage.SetText('Windowsサービスを登録中...', '');
-      Ready := RunPowerShell('register_service.ps1', '-AppDir "' + AppDir + '" -Model "' + SelectedModel + '"', RC) and (RC = 0);
+      Ready := RunPowerShell('register_service.ps1', '-AppDir "' + AppDir + '" -Model "' + SelectedModel + '" -Port ' + IntToStr(SelectedPort), RC) and (RC = 0);
       if not Ready then
       begin
         MsgBox('サービスの登録に失敗しました。' + #13#10 +
@@ -303,12 +305,15 @@ begin
       else
       begin
         ProgressPage.SetText('Open WebUI を起動しています（初回は数分かかります）...', '');
-        Ready := RunPowerShell('wait_ready.ps1', '-Port {#Port} -TimeoutSec 180', RC) and (RC = 0);
+        Ready := RunPowerShell('wait_ready.ps1', '-Port ' + IntToStr(SelectedPort) + ' -TimeoutSec 180', RC) and (RC = 0);
         if not Ready then
           MsgBox('Open WebUI の起動確認がタイムアウトしました。' + #13#10 +
-                 'ブラウザで http://localhost:{#Port} を開いて起動を確認してください。' + #13#10 +
+                 'ブラウザで http://localhost:' + IntToStr(SelectedPort) + ' を開いて起動を確認してください。' + #13#10 +
                  'ログ: ' + AppDir + '\logs\openwebui.err.log', mbInformation, MB_OK);
       end;
+
+      { 使用ポートをラッパーアプリ用に保存 }
+      SaveStringToFile(ExpandConstant('{app}\port.txt'), IntToStr(SelectedPort), False);
 
       WriteUsageFile(AppDir);
 

@@ -1,4 +1,6 @@
-﻿# preflight.ps1 - 環境チェック（OS / ポート8080 / RAM）
+﻿# preflight.ps1 - 環境チェック（OS / ポート / RAM）
+# - ポートは 8080 から順に空きを探し、最初に見つかった空きポートを結果に含める
+#   （8080 が占有されていても 8081 以降を自動利用する）
 # 結果を INI 形式で出力する（Inno Setup 側で GetIniString/GetIniInt により読む）
 # 終了コード: 0 = チェックOK / 1 = 問題あり
 param(
@@ -15,9 +17,15 @@ if ($os -and $os.Version -like '10.*' -and [Environment]::Is64BitOperatingSystem
     $osOk = $true
 }
 
-# --- ポートチェック ---
-$busy = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-$portFree = -not [bool]$busy
+# --- ポートチェック（8080〜8099 のうち最初の空きポートを使う） ---
+$chosenPort = 0
+for ($p = $Port; $p -lt ($Port + 20); $p++) {
+    $busy = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
+    if (-not $busy) {
+        $chosenPort = $p
+        break
+    }
+}
 
 # --- RAM検出（モデル選択ページの表示に使用） ---
 $ram = 8
@@ -30,9 +38,10 @@ if ($comp -and $comp.TotalPhysicalMemory) {
 $lines = @(
     '[preflight]',
     ('os_ok=' + $(if ($osOk) { 'yes' } else { 'no' })),
-    ('port_8080_free=' + $(if ($portFree) { 'yes' } else { 'no' })),
+    ('port_8080_free=' + $(if ($chosenPort -eq 8080) { 'yes' } else { 'no' })),
+    ('port=' + $chosenPort),
     ('ram_gb=' + $ram)
 )
 $lines -join "`r`n" | Out-File -FilePath $IniPath -Encoding ascii
 
-if ($osOk -and $portFree) { exit 0 } else { exit 1 }
+if ($osOk -and $chosenPort -gt 0) { exit 0 } else { exit 1 }
