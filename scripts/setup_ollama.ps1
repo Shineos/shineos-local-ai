@@ -5,13 +5,20 @@
 # 終了コード: 0 = 成功 / 非0 = 失敗
 param(
     [string]$AppDir,
-    [string]$TmpDir
+    [string]$TmpDir,
+    [string]$ProgressFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $LogFile = Join-Path $AppDir 'install.log'
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 function Log { param([string]$Message) "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8 }
+function Progress {
+    param([string]$Message)
+    if ($ProgressFile) {
+        [System.IO.File]::AppendAllText($ProgressFile, "$Message`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+}
 
 function Get-OllamaExe {
     $candidates = @(
@@ -24,6 +31,7 @@ function Get-OllamaExe {
 
 try {
 Log '--- setup_ollama start ---'
+Progress 'Ollama の準備を開始'
 $ollamaExe = Get-OllamaExe
 
 # --- 古いバージョンは最新に更新する ---
@@ -33,6 +41,7 @@ $needUpgrade = $false
 if ($ollamaExe) {
     $ver = & $ollamaExe --version 2>&1
     Log "ollama version: $ver"
+    Progress "Ollama のバージョン: $ver"
     if ($ver -match 'version is (\d+)\.(\d+)') {
         if ([int]$Matches[1] -eq 0 -and [int]$Matches[2] -lt 30) { $needUpgrade = $true }
     }
@@ -48,21 +57,25 @@ if ($needUpgrade) {
         }
         $url = 'https://github.com/ollama/ollama/releases/latest/download/OllamaSetup.exe'
         Log "downloading $url"
+        Progress 'Ollama 本体（1.5GB）をダウンロード中...'
         & curl.exe -L --fail --retry 3 --connect-timeout 30 -o $installer $url
         if ($LASTEXITCODE -ne 0) { throw "OllamaSetup download failed (curl exit $LASTEXITCODE)" }
         $size = (Get-Item $installer).Length
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
+        Progress "ダウンロード完了: $([math]::Round($size / 1MB, 1)) MB"
         if ($size -lt 100MB) { throw "OllamaSetup download looks invalid (${size} bytes) - proxy/block page の可能性" }
     }
     # 旧バージョンのOllamaプロセス/サービスが動作していると、実行中ファイルを
     # 置換できずインストールが失敗する（ERROR_ACCESS_DENIED = exit code 5）ため先に停止する
     Log 'stopping old Ollama services/processes before upgrade'
+    Progress '旧Ollamaのサービス・プロセスを停止中...'
     & sc.exe stop ShineosOllama 2>$null | Out-Null
     & sc.exe stop Ollama 2>$null | Out-Null
     Get-Process -Name ollama -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
 
     Log 'upgrading Ollama (silent)'
+    Progress 'Ollama を最新版に更新中...'
     $p = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
     if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
         # 診断情報（実行中プロセス・サービスの状態）
@@ -74,9 +87,11 @@ if ($needUpgrade) {
     if (-not $ollamaExe) { throw 'ollama.exe not found after installation' }
     $ver = & $ollamaExe --version 2>&1
     Log "ollama version after upgrade: $ver"
+    Progress "Ollama 更新完了: $ver"
 }
 else {
     Log 'ollama version is current (no upgrade needed)'
+    Progress 'Ollama は最新版です（更新不要）'
 }
 Log "ollama.exe: $ollamaExe"
 
@@ -122,6 +137,7 @@ else {
 }
 
 # --- API 起動待ち（最大60秒） ---
+Progress 'Ollama サービスを起動し、API の応答を待機中...'
 $ready = $false
 for ($i = 0; $i -lt 30; $i++) {
     try {
@@ -132,10 +148,13 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 if (-not $ready) { throw 'Ollama API (127.0.0.1:11434) did not become ready' }
 Log '--- setup_ollama done ---'
+Progress 'Ollama の準備が完了'
+Progress 'PROGRESS_DONE:0'
 }
 catch {
     Log "ERROR: $($_.Exception.Message)"
     Log "STACK: $($_.ScriptStackTrace)"
+    Progress 'PROGRESS_DONE:1'
     exit 1
 }
 exit 0

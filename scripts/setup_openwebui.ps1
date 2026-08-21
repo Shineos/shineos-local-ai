@@ -9,13 +9,20 @@ param(
     [string]$Mode,
     [string]$Model = 'qwen3.5:4b',
     [string]$EmbeddingModel = 'nomic-embed-text',
-    [string]$OpenWebuiVersion = '0.11.0'
+    [string]$OpenWebuiVersion = '0.11.0',
+    [string]$ProgressFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $LogFile = Join-Path $AppDir 'install.log'
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 function Log { param([string]$Message) "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8 }
+function Progress {
+    param([string]$Message)
+    if ($ProgressFile) {
+        [System.IO.File]::AppendAllText($ProgressFile, "$Message`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+}
 
 function Get-OllamaExe {
     $candidates = @(
@@ -36,7 +43,8 @@ if ($Mode -eq 'models') {
     Log "ollama version: $ver"
 
     Log "pulling $Model"
-    $pullOut = & $ollama pull $Model 2>&1
+    Progress "モデル $Model をダウンロード中（約3.4GB・10〜60分）..."
+    $pullOut = & $ollama pull $Model 2>&1 | ForEach-Object { Progress $_; $_ }
     $pullCode = $LASTEXITCODE
     if ($pullCode -ne 0) {
         $pullOut | ForEach-Object { Log "ollama-pull: $_" }
@@ -48,15 +56,18 @@ if ($Mode -eq 'models') {
         throw "model pull failed: $Model (exit $pullCode)"
     }
     Log "pulled $Model"
+    Progress "モデル $Model のダウンロードが完了"
 
     Log "pulling $EmbeddingModel"
-    $pullOut2 = & $ollama pull $EmbeddingModel 2>&1
+    Progress "文書検索用モデル $EmbeddingModel をダウンロード中（約274MB）..."
+    $pullOut2 = & $ollama pull $EmbeddingModel 2>&1 | ForEach-Object { Progress $_; $_ }
     $pullCode2 = $LASTEXITCODE
     if ($pullCode2 -ne 0) {
         $pullOut2 | ForEach-Object { Log "ollama-pull: $_" }
         throw "embedding model pull failed: $EmbeddingModel (exit $pullCode2)"
     }
     Log "pulled $EmbeddingModel"
+    Progress "文書検索用モデルのダウンロードが完了"
     Log 'models ready'
 }
 elseif ($Mode -eq 'app') {
@@ -75,32 +86,39 @@ elseif ($Mode -eq 'app') {
     $venvPython = Join-Path $venvDir 'Scripts\python.exe'
     if (-not (Test-Path $venvPython)) {
         Log 'creating venv'
+        Progress 'Python の仮想環境（venv）を作成中...'
         & $pyExe -m venv $venvDir
         if ($LASTEXITCODE -ne 0) { throw 'venv creation failed' }
     }
 
     Log 'upgrading pip'
+    Progress 'pip を更新中...'
     & $venvPython -m pip install --upgrade pip --quiet
     if ($LASTEXITCODE -ne 0) { throw 'pip upgrade failed' }
 
     # torch は CPU 版を先に導入（Windows 既定の CUDA 版 2.5GB 超を回避）
     Log 'installing torch (CPU)'
+    Progress 'torch（CPU版）をインストール中（約3分）...'
     & $venvPython -m pip install torch --index-url https://download.pytorch.org/whl/cpu --quiet
     if ($LASTEXITCODE -ne 0) { throw 'torch install failed' }
 
     Log "installing open-webui==$OpenWebuiVersion"
+    Progress 'open-webui をインストール中（約5〜10分）...'
     & $venvPython -m pip install "open-webui==$OpenWebuiVersion" --quiet
     if ($LASTEXITCODE -ne 0) { throw 'open-webui install failed' }
 
     Log 'app install done'
+    Progress 'open-webui のインストールが完了'
 }
 else {
     throw "unknown mode: $Mode"
 }
+Progress 'PROGRESS_DONE:0'
 }
 catch {
     Log "ERROR: $($_.Exception.Message)"
     Log "STACK: $($_.ScriptStackTrace)"
+    Progress 'PROGRESS_DONE:1'
     exit 1
 }
 exit 0

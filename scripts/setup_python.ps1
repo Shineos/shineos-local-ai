@@ -6,13 +6,20 @@
 param(
     [string]$AppDir,
     [string]$TmpDir,
-    [string]$Version = '3.12.10'
+    [string]$Version = '3.12.10',
+    [string]$ProgressFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $LogFile = Join-Path $AppDir 'install.log'
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 function Log { param([string]$Message) "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8 }
+function Progress {
+    param([string]$Message)
+    if ($ProgressFile) {
+        [System.IO.File]::AppendAllText($ProgressFile, "$Message`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+}
 
 function Test-UsablePython {
     param([string]$Candidate)
@@ -58,6 +65,7 @@ function Find-PythonExe {
 
 try {
     Log '--- setup_python start ---'
+    Progress 'Python 3.12 の準備を開始'
     $pyDir = Join-Path $AppDir 'python'
     $pyExe = Join-Path $pyDir 'python.exe'
     $pathFile = Join-Path $AppDir 'python-path.txt'
@@ -69,6 +77,8 @@ try {
     if ($found) {
         Log "using existing python: $found"
         $found | Out-File -FilePath $pathFile -Encoding ascii
+        Progress "既存のPythonを使用: $found"
+        Progress 'PROGRESS_DONE:0'
         Log '--- setup_python done (reuse) ---'
         exit 0
     }
@@ -81,10 +91,12 @@ try {
         }
         $url = "https://www.python.org/ftp/python/$Version/python-$Version-amd64.exe"
         Log "downloading $url"
+        Progress 'Python 3.12.10 をダウンロード中（25.7 MB）...'
         & curl.exe -L --fail --retry 3 --connect-timeout 30 -o $installer $url
         if ($LASTEXITCODE -ne 0) { throw "python download failed (curl exit $LASTEXITCODE)" }
         $size = (Get-Item $installer).Length
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
+        Progress "ダウンロード完了: $([math]::Round($size / 1MB, 1)) MB"
         if ($size -lt 20MB) { throw "python download looks invalid (${size} bytes) - proxy/block page の可能性" }
     }
     else {
@@ -93,6 +105,7 @@ try {
 
     # --- サイレントインストール ---
     Log 'installing python (silent, to app dir)'
+    Progress 'Python をインストール中（古い登録があれば自動でアンインストール）...'
     $msiLog = Join-Path $AppDir 'logs\python-install.log'
     New-Item -ItemType Directory -Force -Path (Join-Path $AppDir 'logs') | Out-Null
     $installArgs = @(
@@ -126,10 +139,12 @@ try {
         # バンドルが"Present"のままでは再実行が「Modify（無操作）」になり
         # 新規導入されないため、アンインストールしてから再インストールする
         Log "python.exe not found at expected path: $pyExe - stale install detected, uninstalling..."
+        Progress '古いPythonの登録をアンインストール中...'
         $u = Start-Process -FilePath $installer -ArgumentList @('/uninstall', '/quiet', '/norestart') -Wait -PassThru
         Log "python uninstaller exit code: $($u.ExitCode)"
         Start-Sleep -Seconds 2
         Log 'reinstalling python (fresh install)'
+        Progress 'Python を再インストール中...'
         $p2 = Start-Process -FilePath $installer -ArgumentList $installArgs -Wait -PassThru
         Log "python reinstall exit code: $($p2.ExitCode)"
         if ($p2.ExitCode -ne 0 -and $p2.ExitCode -ne 3010) {
@@ -151,11 +166,14 @@ try {
 
     $ver = & $found --version 2>&1
     Log "installed: $ver"
+    Progress "インストール完了: $ver"
+    Progress 'PROGRESS_DONE:0'
     Log '--- setup_python done ---'
     exit 0
 }
 catch {
     Log "ERROR: $($_.Exception.Message)"
     Log "STACK: $($_.ScriptStackTrace)"
+    Progress 'PROGRESS_DONE:1'
     exit 1
 }
