@@ -64,44 +64,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
           Get-ChildItem dist | Select-Object Name, Length
 
-      # ---- SignPath コード署名 ----
-      # upload-artifact は既定でZIP化するため archive: false で生のexeを渡す
-      # （Artifact設定の <pe-file> ルートと一致させる。SignPath公式ドキュメント推奨）
-      - name: Upload unsigned artifact (for SignPath)
-        id: upload-unsigned
-        uses: actions/upload-artifact@v7
-        with:
-          path: dist/*.exe
-          archive: false
-          if-no-files-found: error
-
-      - name: Submit signing request to SignPath
-        id: sign
-        uses: signpath/github-action-submit-signing-request@v2
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          # artifact-configuration-slug: 未指定時はプロジェクトの既定を使用。
-          #   指定する場合: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
-          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 600
-          output-artifact-directory: signed
-          skip-decompress: true  # archive:false で生のexeが返るためそのまま保存
-
-      - name: Replace unsigned exe with signed exe
+      # ---- SignPath コード署名（REST API 直接方式） ----
+      # GitHubコネクタ（Trusted Build System）は組織設定が必須でAPIから設定不可のため、
+      # SignPath REST API に直接署名リクエストを送る方式を使用（2026-08-21 実証済み）
+      - name: Sign with SignPath (direct API)
         shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORG_ID: ${{ secrets.SIGNPATH_ORG_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
         run: |
-          $signed = Get-ChildItem signed -Recurse -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $signed) {
-            Write-Error "signed exe not found. signed/ の中身:"
-            Get-ChildItem signed -Recurse | Select-Object FullName, Length
-            throw "signed exe not found (アーカイブ返却の場合は skip-decompress を false に変更)"
-          }
-          $built = Get-ChildItem dist -Filter *.exe | Select-Object -First 1
-          Move-Item -Force $signed.FullName $built.FullName
+          $exe = Get-ChildItem dist -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { throw 'no exe found in dist' }
+          & .\scripts\sign_with_signpath.ps1 -ArtifactPath $exe.FullName -OutputPath "dist\signed-tmp.exe"
+          if ($LASTEXITCODE -ne 0) { throw "SignPath signing failed (exit $LASTEXITCODE)" }
+          Move-Item -Force "dist\signed-tmp.exe" $exe.FullName
           Get-ChildItem dist | Select-Object Name, Length
 
       - name: Upload artifact (manual build)
