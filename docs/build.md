@@ -233,8 +233,11 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 
 ### 7.3 Python バージョンの更新
 
-`installer.iss` の `#define PythonVersion` を更新する（`setup_python.ps1` は `-Version` 引数で受け取る。スクリプト内の既定値も念のため同期）。python.org のアーカイブURL:
-`https://www.python.org/ftp/python/<version>/python-<version>-amd64.exe`
+`installer.iss` の `#define PythonVersion` を更新する（`setup_python.ps1` は `-Version` 引数で受け取る。スクリプト内の既定値も念のため同期）。
+Python は **python.org の NUGet パッケージ（zip・ポータブル）** で導入する:
+`https://www.nuget.org/api/v2/package/python/<version>`
+（MSIインストーラは使わない。アンインストール/再インストールを繰り返しても
+「バンドル登録の残りで何も展開されない」問題が発生しないため）
 
 ### 7.4 モデルの追加・変更
 
@@ -312,7 +315,7 @@ pip index versions open-webui   # 最新安定版の確認（要Windows/Python�
 | Ollamaの自動起動 | 公式サービスの再起動時挙動は環境依存。フォールバック（ShineosOllama）を用意 | T3の再起動テストで確認。問題時は `sc start Ollama` |
 | DuckDuckGoのレート制限 | 大量検索で空回答（Open WebUIの既知issue） | ユーザーガイドに記載。SearXNG切替手順（§3.2）を提供 |
 | インストール時間 | 30〜90分（Ollama本体1.5GB＋モデルDL3.7GBなど総DL約6GBが大半） | 進捗ページに時間表示。ダウンロード失敗時は再実行で復旧（冪等） |
-| 過去の不完全なPython導入 | 旧版のTargetDir不具合で導入されたPythonが登録上「Present」のまま残り、以後の実行が無操作（Modify）になる問題があった | v1.0.5で自己修復を実装（自動アンインストール→クリーン再導入）。進捗画面にも明記 |
+| 過去の不完全なPython導入 | 旧版のTargetDir不具合やMSIバンドル登録の残りで「導入済み扱いになり何も展開されない」問題があった | v1.0.16で**ポータブル方式（NUGet zip）に切替**。インストーラ・登録が無いため構造的に解消 |
 | 再インストールでデータ初期化 | {app}\data を削除するためアップロード文書は消える | ユーザーガイド・はじめに.txtに明記 |
 | アンインストール後にOllama本体が残る | モデル（.ollama）はユーザーデータとして残す仕様 | ユーザーガイドに明記（完全削除は `ollama` コマンド等で手動） |
 
