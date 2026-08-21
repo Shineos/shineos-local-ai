@@ -32,12 +32,31 @@ if ($Mode -eq 'models') {
     Log "--- models: $Model / $EmbeddingModel ---"
     $ollama = Get-OllamaExe
     if (-not $ollama) { throw 'ollama.exe not found' }
+    $ver = & $ollama --version 2>&1
+    Log "ollama version: $ver"
+
     Log "pulling $Model"
-    & $ollama pull $Model
-    if ($LASTEXITCODE -ne 0) { throw "model pull failed: $Model" }
+    $pullOut = & $ollama pull $Model 2>&1
+    $pullCode = $LASTEXITCODE
+    if ($pullCode -ne 0) {
+        $pullOut | ForEach-Object { Log "ollama-pull: $_" }
+        $errLog = Join-Path $AppDir 'logs\ollama.err.log'
+        if (Test-Path $errLog) {
+            Log '--- ollama.err.log (last 30 lines) ---'
+            Get-Content $errLog -Tail 30 | ForEach-Object { Log "ollama-err: $_" }
+        }
+        throw "model pull failed: $Model (exit $pullCode)"
+    }
+    Log "pulled $Model"
+
     Log "pulling $EmbeddingModel"
-    & $ollama pull $EmbeddingModel
-    if ($LASTEXITCODE -ne 0) { throw "embedding model pull failed: $EmbeddingModel" }
+    $pullOut2 = & $ollama pull $EmbeddingModel 2>&1
+    $pullCode2 = $LASTEXITCODE
+    if ($pullCode2 -ne 0) {
+        $pullOut2 | ForEach-Object { Log "ollama-pull: $_" }
+        throw "embedding model pull failed: $EmbeddingModel (exit $pullCode2)"
+    }
+    Log "pulled $EmbeddingModel"
     Log 'models ready'
 }
 elseif ($Mode -eq 'app') {

@@ -46,6 +46,8 @@ if (-not $ollamaExe) {
 }
 if (-not $ollamaExe) { throw 'ollama.exe not found after installation' }
 Log "ollama.exe: $ollamaExe"
+$ver = & $ollamaExe --version 2>&1
+Log "ollama version: $ver"
 
 # --- サービス確認（公式「Ollama」→ 無ければ NSSM フォールバック） ---
 $svc = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
