@@ -47,7 +47,9 @@ function Find-PythonExe {
         (Join-Path $env:ProgramFiles 'Python312\python.exe'),
         (Join-Path $env:ProgramFiles 'Python\python.exe'),
         (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
-        'C:\Program\python.exe'
+        'C:\Program\python.exe',
+        'C:\Program\Python312\python.exe',
+        'C:\Python312\python.exe'
     )) {
         if (Test-UsablePython $c) { return $c }
     }
@@ -117,11 +119,31 @@ try {
         throw "python installer exit code $($p.ExitCode)"
     }
 
-    # --- 導入先の確認（過去の不完全導入が原因で別場所に入るケースを探索で救済） ---
+    # --- 導入先の確認 ---
     if (Test-Path $pyExe) { $found = $pyExe }
     else {
-        Log "python.exe not found at expected path: $pyExe - searching..."
-        $found = Find-PythonExe
+        # 過去の不完全な導入（旧版のTargetDir不具合など）が残っているケース。
+        # バンドルが"Present"のままでは再実行が「Modify（無操作）」になり
+        # 新規導入されないため、アンインストールしてから再インストールする
+        Log "python.exe not found at expected path: $pyExe - stale install detected, uninstalling..."
+        $u = Start-Process -FilePath $installer -ArgumentList @('/uninstall', '/quiet', '/norestart') -Wait -PassThru
+        Log "python uninstaller exit code: $($u.ExitCode)"
+        Start-Sleep -Seconds 2
+        Log 'reinstalling python (fresh install)'
+        $p2 = Start-Process -FilePath $installer -ArgumentList $installArgs -Wait -PassThru
+        Log "python reinstall exit code: $($p2.ExitCode)"
+        if ($p2.ExitCode -ne 0 -and $p2.ExitCode -ne 3010) {
+            if (Test-Path $msiLog) {
+                Log '--- python MSI log (last 40 lines) ---'
+                Get-Content $msiLog -Tail 40 | ForEach-Object { Log "MSI: $_" }
+            }
+            throw "python reinstall exit code $($p2.ExitCode)"
+        }
+        if (Test-Path $pyExe) { $found = $pyExe }
+        else {
+            Log "python.exe still missing after reinstall: $pyExe - searching..."
+            $found = Find-PythonExe
+        }
     }
     if (-not $found) { throw "python.exe not found after install: $pyExe" }
     Log "using python: $found"
