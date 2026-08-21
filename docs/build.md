@@ -373,6 +373,16 @@ GitHubコネクタ（Trusted Build System）方式は組織へのコネクタ設
 
 SmartScreenで「発行元: Shineos Inc.」と認識されるようにする手順。
 
+**選択肢A: SignPath Foundation のOSS無料プログラム（費用ゼロ・推奨）**
+
+- SignPathはオープンソースプロジェクト向けに**無料のコード署名を提供**し、**証明書もプロジェクトごとに提供**している
+  （https://www.signpath.io/solutions/open-source-community 、200以上のOSSプロジェクトが利用中）
+- 申請: 同ページの「Join the community」または info@signpath.io にプロジェクト情報（リポジトリ・ライセンス・用途）を送付 → 審査
+- 注意: 審査があり承認まで時間がかかる場合がある。本リポジトリは公開・MITライセンスで形式上の資格はある
+- 承認後: 提供された証明書で署名ポリシーを作成 → 変数切替 → リリース（ステップ4〜6と同じ）
+
+**選択肢B: 実コード署名証明書の購入（有料）**
+
 **ユーザー（コンソール・CA）のみで実施可能なステップ**（証明書操作はAPI未公開のため）:
 
 1. SignPathコンソール → **Certificates → Add certificate → CSR（certificate signing request）を発行**
