@@ -55,14 +55,17 @@ Progress 'preparing Ollama'
 $ollamaExe = Get-OllamaExe
 
 # --- 古いバージョンは最新に更新する ---
-# （旧クライアントは新しいモデル（qwen3.5系）のマニフェストを取得できないため。
+# （旧クライアントは新しいモデル（qwen2.5系など）のマニフェストを取得できないため。
 #   例: 0.13.5 のような旧版では pull が即失敗する）
 $needUpgrade = $false
 if ($ollamaExe) {
     $ver = & $ollamaExe --version 2>&1
     Log "ollama version: $ver"
     Progress "ollama version: $ver"
-    if ($ver -match 'version is (\d+)\.(\d+)') {
+    # stderr（"Warning: could not connect..."）と stdout が別要素の配列で返るため、
+    # 先にスカラーへ結合しないと $Matches が設定されず $Matches[1] が例外になる（PS 5.1）
+    $verText = $ver -join ' '
+    if ($verText -match 'version is (\d+)\.(\d+)') {
         if ([int]$Matches[1] -eq 0 -and [int]$Matches[2] -lt 30) { $needUpgrade = $true }
     }
     else { $needUpgrade = $true }

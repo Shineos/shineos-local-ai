@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.22"
+#define MyAppVersion "1.0.24"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -50,6 +50,7 @@ Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 ; dontcopy で展開し [Code] から ExtractTemporaryFile する
 [Files]
 Source: "..\scripts\preflight.ps1";        DestDir: "{tmp}"; Flags: dontcopy
+Source: "..\scripts\run_all.ps1";          DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\setup_python.ps1";     DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\setup_ollama.ps1";     DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\setup_openwebui.ps1";  DestDir: "{tmp}"; Flags: dontcopy
@@ -93,6 +94,7 @@ const
 procedure ExtractSetupFiles;
 begin
   ExtractTemporaryFile('preflight.ps1');
+  ExtractTemporaryFile('run_all.ps1');
   ExtractTemporaryFile('setup_python.ps1');
   ExtractTemporaryFile('setup_ollama.ps1');
   ExtractTemporaryFile('setup_openwebui.ps1');
@@ -156,10 +158,12 @@ begin
   ModelPage := CreateInputOptionPage(wpSelectDir,
     'AIモデルの選択',
     'インストールするAIモデルを選択してください',
-    '検出メモリ: ' + IntToStr(RamGB) + ' GB。動作が重い場合は「軽量」を選択してください。',
+    '検出メモリ: ' + IntToStr(RamGB) + ' GB。CPU専用PC向けに最適化した日本語モデルです。' + #13#10 +
+    '業務利用の標準は「3b（推奨）」、1.5bは補助（軽量・速度優先）向けです。' + #13#10 +
+    '動作が重い場合は「軽量」を選択してください。',
     True, False);
-  ModelPage.Add('qwen3.5:4b（推奨）　性能重視・16GB以上で快適・約3.4GB');
-  ModelPage.Add('qwen3.5:2b（軽量）　8GB機に最適・約2.7GB');
+  ModelPage.Add('qwen2.5:3b（推奨）　業務利用の標準・高速・約1.9GB');
+  ModelPage.Add('qwen2.5:1.5b（軽量）　補助向け・8GB機に最適・約1GB');
   ModelPage.SelectedValueIndex := 0;
 end;
 
@@ -173,7 +177,7 @@ begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
     'Shineos Local AI のセットアップを実行しています。' + #13#10 +
-    '完了まで約30〜90分かかります（Ollama本体1.5GB＋AIモデル3.4GBなど合計約6GBのダウンロードを含みます）。' + #13#10 +
+    '完了まで約20〜60分かかります（Ollama本体1.5GB＋AIモデル1.9GBなど合計約4GBのダウンロードを含みます）。' + #13#10 +
     'インストール中はウィンドウを閉じないでください。');
   try
     ProgressPage.Show;
@@ -235,9 +239,9 @@ begin
       Exit;
     end;
     if ModelPage.SelectedValueIndex = 1 then
-      SelectedModel := 'qwen3.5:2b'
+      SelectedModel := 'qwen2.5:1.5b'
     else
-      SelectedModel := 'qwen3.5:4b';
+      SelectedModel := 'qwen2.5:3b';
     Result := RunLongSteps(AppDir);
   end;
 end;

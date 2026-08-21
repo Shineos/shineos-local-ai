@@ -32,7 +32,7 @@
 ## 使い方
 
 1. `ShineosLocalAI-Setup-<version>.exe` をダブルクリック（管理者権限を要求されます）
-2. AIモデルを選択（既定: qwen3.5:4b / 軽量: qwen3.5:2b）
+2. AIモデルを選択（既定: qwen2.5:3b / 軽量: qwen2.5:1.5b）
 3. インストール完了後、ブラウザで **http://localhost:8080** を開くだけ
 
 詳細は [docs/user-guide.md](docs/user-guide.md) を参照してください。

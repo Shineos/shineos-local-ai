@@ -19,9 +19,9 @@ Shineos Local AI - Third Party Notices
    - 出典: https://github.com/open-webui/open-webui
    - 用途: チャットUI・RAG・Web検索（pipで自動導入）
 
-4. Qwen3.5 (qwen3.5:4b / qwen3.5:2b)
+4. Qwen2.5 (qwen2.5:3b / qwen2.5:1.5b)
    - ライセンス: Apache License 2.0
-   - 出典: https://ollama.com/library/qwen3.5 / https://huggingface.co/Qwen
+   - 出典: https://ollama.com/library/qwen2.5 / https://huggingface.co/Qwen
    - 用途: LLMモデル（インストール時にダウンロード）
 
 5. nomic-embed-text

@@ -7,7 +7,7 @@
 param(
     [string]$AppDir,
     [string]$Mode,
-    [string]$Model = 'qwen3.5:4b',
+    [string]$Model = 'qwen2.5:3b',
     [string]$EmbeddingModel = 'nomic-embed-text',
     [string]$OpenWebuiVersion = '0.11.0',
     [string]$ProgressFile = ''
@@ -43,7 +43,7 @@ if ($Mode -eq 'models') {
     Log "ollama version: $ver"
 
     Log "pulling $Model"
-    Progress "downloading model $Model (3.4GB)..."
+    Progress "downloading model $Model..."
     # 外部コマンドの stderr 出力（進捗）で NativeCommandError が発生しないよう
     # キャプチャ中のみ ErrorActionPreference を緩める
     $ErrorActionPreference = 'Continue'
