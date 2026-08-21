@@ -168,7 +168,7 @@ end;
 function RunLongSteps(AppDir: String): Boolean;
 var
   RC: Integer;
-  StepError: String;
+  StepError: AnsiString;  // LoadStringFromFile は AnsiString が必須
 begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
