@@ -129,6 +129,14 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+{ 長いステップ用: PowerShellをコンソール表示で実行し、ライブログを確認できるようにする }
+function RunPowerShellVisible(Script, Params: String; var ResultCode: Integer): Boolean;
+begin
+  Result := Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\' + Script) + '" ' + Params,
+    '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode);
+end;
+
 
 { ---------- ウィザード初期化 ---------- }
 
