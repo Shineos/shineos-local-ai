@@ -130,58 +130,98 @@ else {
 }
 Log "ollama.exe: $ollamaExe"
 
-# --- サービス確認（公式「Ollama」→ 無ければ NSSM フォールバック） ---
-$svc = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
-if ($svc) {
-    # 公式サービスがある場合は、以前のフォールバックサービスを削除（起動時競合防止）
-    $fbSvc = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
-    if ($fbSvc) {
-        Log 'removing old fallback service (ShineosOllama) to avoid conflict'
-        & sc.exe stop ShineosOllama 2>$null | Out-Null
-        & sc.exe delete ShineosOllama 2>$null | Out-Null
-    }
-    Log 'service "Ollama" found: ensure auto start'
-    & sc.exe config Ollama start= auto | Out-Null
-    if ($svc.Status -ne 'Running') {
-        Log 'starting service "Ollama"'
-        & sc.exe start Ollama | Out-Null
-    }
-}
-else {
-    $fbSvc = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
-    if (-not $fbSvc) {
-        Log 'service "Ollama" not found: register NSSM fallback (ShineosOllama)'
-        $nssm = Join-Path $TmpDir 'nssm.exe'
-        if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
-        $logDir = Join-Path $AppDir 'logs'
-        New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-        & $nssm install ShineosOllama $ollamaExe 'serve' | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'nssm install ShineosOllama failed' }
-        & $nssm set ShineosOllama Start SERVICE_AUTO_START | Out-Null
-        & $nssm set ShineosOllama AppStdout (Join-Path $logDir 'ollama.log') | Out-Null
-        & $nssm set ShineosOllama AppStderr (Join-Path $logDir 'ollama.err.log') | Out-Null
-    }
-    else {
-        Log 'service "ShineosOllama" already exists: ensure auto start'
-        & sc.exe config ShineosOllama start= auto | Out-Null
-    }
-    if ($fbSvc.Status -ne 'Running') {
-        Log 'starting service "ShineosOllama"'
-        & sc.exe start ShineosOllama | Out-Null
-    }
-}
-
-# --- API 起動待ち（最大60秒） ---
-Progress 'starting Ollama service...'
-$ready = $false
-for ($i = 0; $i -lt 30; $i++) {
+# --- Ollama の起動（公式サービス → NSSM フォールバック → 直接起動 の3段構え） ---
+function Test-OllamaApi {
     try {
         $r = Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/version' -TimeoutSec 3
-        if ($r.version) { $ready = $true; break }
+        return [bool]$r.version
     }
-    catch { Start-Sleep -Seconds 2 }
+    catch { return $false }
 }
-if (-not $ready) { throw 'Ollama API (127.0.0.1:11434) did not become ready' }
+function Wait-OllamaApi {
+    param([int]$Seconds = 20)
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-OllamaApi) { return $true }
+        Start-Sleep -Seconds 2
+    }
+    return $false
+}
+
+# 1) 既に起動していれば何もしない
+if (Test-OllamaApi) {
+    Log 'Ollama API already running'
+    Progress 'Ollama ready'
+    Progress 'PROGRESS_DONE:0'
+    exit 0
+}
+
+$svc = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
+$fbSvc = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
+
+# 2) 公式サービスを優先して起動
+if ($svc) {
+    Log 'service "Ollama" found: ensure auto start and start'
+    Progress 'starting Ollama service...'
+    & sc.exe config Ollama start= auto | Out-Null
+    if ($svc.Status -ne 'Running') { & sc.exe start Ollama | Out-Null }
+    if (Wait-OllamaApi -Seconds 20) {
+        # 公式が動いたのでフォールバックを削除（起動時競合防止）
+        if ($fbSvc) {
+            Log 'removing fallback service (ShineosOllama)'
+            & sc.exe stop ShineosOllama 2>$null | Out-Null
+            & sc.exe delete ShineosOllama 2>$null | Out-Null
+        }
+        Log 'Ollama ready (official service)'
+        Progress 'Ollama ready'
+        Progress 'PROGRESS_DONE:0'
+        exit 0
+    }
+    Log 'official service did not become ready - trying fallback'
+}
+
+# 3) NSSM フォールバックサービス（既存 or 新規登録）を起動
+if (-not $fbSvc) {
+    Log 'registering NSSM fallback (ShineosOllama)'
+    Progress 'registering Ollama service...'
+    $nssm = Join-Path $TmpDir 'nssm.exe'
+    if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
+    $logDir = Join-Path $AppDir 'logs'
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    & $nssm install ShineosOllama $ollamaExe 'serve' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'nssm install ShineosOllama failed' }
+    & $nssm set ShineosOllama Start SERVICE_AUTO_START | Out-Null
+    & $nssm set ShineosOllama AppStdout (Join-Path $logDir 'ollama.log') | Out-Null
+    & $nssm set ShineosOllama AppStderr (Join-Path $logDir 'ollama.err.log') | Out-Null
+}
+Log 'starting fallback service (ShineosOllama)'
+Progress 'starting Ollama service...'
+& sc.exe config ShineosOllama start= auto | Out-Null
+if ((Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue).Status -ne 'Running') {
+    & sc.exe start ShineosOllama | Out-Null
+}
+if (Wait-OllamaApi -Seconds 20) {
+    Log 'Ollama ready (fallback service)'
+    Progress 'Ollama ready'
+    Progress 'PROGRESS_DONE:0'
+    exit 0
+}
+
+# 4) 最終フォールバック: サービスが機能しない場合はプロセスを直接起動
+Log 'services failed - starting ollama.exe serve directly'
+Progress 'starting Ollama directly...'
+Start-Process -FilePath $ollamaExe -ArgumentList 'serve' -WindowStyle Hidden
+if (Wait-OllamaApi -Seconds 15) {
+    Log 'Ollama ready (direct process)'
+    Progress 'Ollama ready'
+    Progress 'PROGRESS_DONE:0'
+    exit 0
+}
+
+# 5) 診断情報を記録して失敗
+Get-Service -Name Ollama, ShineosOllama -ErrorAction SilentlyContinue | ForEach-Object { Log "service state: $($_.Name) = $($_.Status)" }
+Get-CimInstance Win32_Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('Ollama', 'ShineosOllama') } | ForEach-Object { Log "service info: $($_.Name) state=$($_.State) path=$($_.PathName)" }
+throw 'Ollama API (127.0.0.1:11434) did not become ready'
 Log '--- setup_ollama done ---'
 Progress 'Ollama ready'
 Progress 'PROGRESS_DONE:0'
