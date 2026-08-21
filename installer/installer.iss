@@ -134,7 +134,8 @@ end;
 // スクリプト側が最後に「PROGRESS_DONE:<exit code>」を書いて完了を知らせる
 function RunStepLive(StepTitle, Script, Params, ProgressFile: String; var ResultCode: Integer): Boolean;
 var
-  Content, LastLine: String;
+  Content: AnsiString;  // LoadStringFromFile は AnsiString が必須
+  LastLine: String;
   P: Integer;
   Done: Boolean;
 begin
