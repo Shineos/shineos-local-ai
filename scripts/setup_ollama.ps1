@@ -20,6 +20,26 @@ function Progress {
     }
 }
 
+# インストーラがハングした場合に備えたタイムアウト付き実行
+function Invoke-WithTimeout {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [int]$TimeoutSec = 600,
+        [string]$Label = 'process'
+    )
+    $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while (-not $p.HasExited) {
+        if ((Get-Date) -gt $deadline) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw "$Label timed out after ${TimeoutSec}s and was killed: $FilePath"
+        }
+        Start-Sleep -Seconds 2
+    }
+    return $p.ExitCode
+}
+
 function Get-OllamaExe {
     $candidates = @(
         (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
@@ -72,16 +92,31 @@ if ($needUpgrade) {
     & sc.exe stop ShineosOllama 2>$null | Out-Null
     & sc.exe stop Ollama 2>$null | Out-Null
     Get-Process -Name ollama -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
+    # プロセスの終了を確認（最大15秒）
+    for ($i = 0; $i -lt 15; $i++) {
+        if (-not (Get-Process -Name ollama -ErrorAction SilentlyContinue)) { break }
+        Start-Sleep -Seconds 1
+    }
 
-    Log 'upgrading Ollama (silent)'
-    Progress 'upgrading Ollama to latest...'
-    $p = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
-    if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
+    # 上書き更新は旧版アンインストーラがハングすることがあるため、
+    # 先に旧版をアンインストールしてからクリーン導入する（各ステップはタイムアウト付き）
+    $oldUnins = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\unins000.exe'
+    if (Test-Path $oldUnins) {
+        Log "uninstalling old Ollama: $oldUnins"
+        Progress 'uninstalling old Ollama...'
+        $uninsCode = Invoke-WithTimeout -FilePath $oldUnins -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -TimeoutSec 300 -Label 'old Ollama uninstaller'
+        Log "old Ollama uninstaller exit code: $uninsCode"
+    }
+
+    Log 'installing Ollama (silent)'
+    Progress 'installing Ollama (latest version)...'
+    $installCode = Invoke-WithTimeout -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -TimeoutSec 900 -Label 'OllamaSetup'
+    Log "OllamaSetup exit code: $installCode"
+    if ($installCode -ne 0 -and $installCode -ne 3010) {
         # 診断情報（実行中プロセス・サービスの状態）
         Get-Process -Name ollama -ErrorAction SilentlyContinue | ForEach-Object { Log "ollama process running: $($_.Path)" }
         Get-Service -Name Ollama, ShineosOllama -ErrorAction SilentlyContinue | ForEach-Object { Log "service state: $($_.Name) = $($_.Status)" }
-        throw "OllamaSetup exit code $($p.ExitCode)"
+        throw "OllamaSetup exit code $installCode"
     }
     $ollamaExe = Get-OllamaExe
     if (-not $ollamaExe) { throw 'ollama.exe not found after installation' }

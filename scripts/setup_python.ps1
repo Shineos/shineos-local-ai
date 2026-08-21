@@ -21,6 +21,26 @@ function Progress {
     }
 }
 
+# インストーラがハングした場合に備えたタイムアウト付き実行
+function Invoke-WithTimeout {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [int]$TimeoutSec = 600,
+        [string]$Label = 'process'
+    )
+    $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while (-not $p.HasExited) {
+        if ((Get-Date) -gt $deadline) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw "$Label timed out after ${TimeoutSec}s and was killed: $FilePath"
+        }
+        Start-Sleep -Seconds 2
+    }
+    return $p.ExitCode
+}
+
 function Test-UsablePython {
     param([string]$Candidate)
     if (-not (Test-Path $Candidate)) { return $false }
@@ -122,14 +142,14 @@ try {
         'CompileAll=0',
         "/log `"$msiLog`""
     )
-    $p = Start-Process -FilePath $installer -ArgumentList $installArgs -Wait -PassThru
-    Log "python installer exit code: $($p.ExitCode)"
-    if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
+    $installCode = Invoke-WithTimeout -FilePath $installer -ArgumentList $installArgs -TimeoutSec 600 -Label 'python installer'
+    Log "python installer exit code: $installCode"
+    if ($installCode -ne 0 -and $installCode -ne 3010) {
         if (Test-Path $msiLog) {
             Log '--- python MSI log (last 40 lines) ---'
             Get-Content $msiLog -Tail 40 | ForEach-Object { Log "MSI: $_" }
         }
-        throw "python installer exit code $($p.ExitCode)"
+        throw "python installer exit code $installCode"
     }
 
     # --- 導入先の確認 ---
@@ -140,19 +160,19 @@ try {
         # 新規導入されないため、アンインストールしてから再インストールする
         Log "python.exe not found at expected path: $pyExe - stale install detected, uninstalling..."
         Progress 'uninstalling stale python registration...'
-        $u = Start-Process -FilePath $installer -ArgumentList @('/uninstall', '/quiet', '/norestart') -Wait -PassThru
-        Log "python uninstaller exit code: $($u.ExitCode)"
+        $uninsCode = Invoke-WithTimeout -FilePath $installer -ArgumentList @('/uninstall', '/quiet', '/norestart') -TimeoutSec 300 -Label 'python uninstaller'
+        Log "python uninstaller exit code: $uninsCode"
         Start-Sleep -Seconds 2
         Log 'reinstalling python (fresh install)'
         Progress 'reinstalling python...'
-        $p2 = Start-Process -FilePath $installer -ArgumentList $installArgs -Wait -PassThru
-        Log "python reinstall exit code: $($p2.ExitCode)"
-        if ($p2.ExitCode -ne 0 -and $p2.ExitCode -ne 3010) {
+        $reinstallCode = Invoke-WithTimeout -FilePath $installer -ArgumentList $installArgs -TimeoutSec 600 -Label 'python reinstaller'
+        Log "python reinstall exit code: $reinstallCode"
+        if ($reinstallCode -ne 0 -and $reinstallCode -ne 3010) {
             if (Test-Path $msiLog) {
                 Log '--- python MSI log (last 40 lines) ---'
                 Get-Content $msiLog -Tail 40 | ForEach-Object { Log "MSI: $_" }
             }
-            throw "python reinstall exit code $($p2.ExitCode)"
+            throw "python reinstall exit code $reinstallCode"
         }
         if (Test-Path $pyExe) { $found = $pyExe }
         else {
