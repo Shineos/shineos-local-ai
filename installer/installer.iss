@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.19"
+#define MyAppVersion "1.0.20"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -168,6 +168,7 @@ end;
 function RunLongSteps(AppDir: String): Boolean;
 var
   RC: Integer;
+  StepError: String;
 begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
@@ -197,9 +198,16 @@ begin
         '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '" -Model "' + SelectedModel + '" -PythonVersion "{#PythonVersion}" -OpenWebuiVersion "{#OpenWebuiVersion}"', RC)
        or (RC <> 0) then
     begin
-      MsgBox('インストールに失敗しました。' + #13#10 +
-             'ログ: ' + AppDir + '\install.log' + #13#10 +
-             '「次へ」をもう一度押すと続きから再開できます。', mbError, MB_OK);
+      StepError := '';
+      if LoadStringFromFile(ExpandConstant('{tmp}\step_error.txt'), StepError) and (StepError <> '') then
+        MsgBox('インストールに失敗しました。' + #13#10 + #13#10 +
+               '失敗したステップ: ' + StepError + #13#10 + #13#10 +
+               'ログ: ' + AppDir + '\install.log' + #13#10 +
+               '「次へ」をもう一度押すと続きから再開できます。', mbError, MB_OK)
+      else
+        MsgBox('インストールに失敗しました。' + #13#10 +
+               'ログ: ' + AppDir + '\install.log' + #13#10 +
+               '「次へ」をもう一度押すと続きから再開できます。', mbError, MB_OK);
       Exit;
     end;
 

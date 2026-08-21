@@ -13,6 +13,8 @@ param(
 $ErrorActionPreference = 'Continue'
 $LogFile = Join-Path $AppDir 'install.log'
 $here = $PSScriptRoot
+# 前回の失敗情報をクリア
+'' | Out-File -FilePath (Join-Path $TmpDir 'step_error.txt') -Encoding ascii -ErrorAction SilentlyContinue
 
 function Log-Console {
     param([string]$Message)
@@ -31,6 +33,8 @@ function Invoke-Step {
     $code = $LASTEXITCODE
     if ($code -ne 0) {
         Log-Console "===== STEP FAILED: $Name (exit $code) ====="
+        # インストーラのエラーダイアログに表示するため、失敗情報をファイルに残す
+        "STEP FAILED: $Name (exit $code)" | Out-File -FilePath (Join-Path $TmpDir 'step_error.txt') -Encoding ascii
         exit $code
     }
     Log-Console "===== STEP OK: $Name ====="
