@@ -335,36 +335,39 @@ exe のビルドは **GitHub Actions が自動実行**する（`.github/workflow
 
 ### 10.2 コード署名（SignPath.io）
 
-exe はビルド後に **SignPath.io でコード署名**され、署名済みファイルが Releases に公開される（`signpath/github-action-submit-signing-request@v2`）。
+exe はビルド後に **SignPath.io でコード署名**され、署名済みファイルが Releases に公開される。
+
+**署名方式**: SignPath REST API への**直接リクエスト**（`scripts/sign_with_signpath.ps1`）。
+GitHubコネクタ（Trusted Build System）方式は組織へのコネクタ設定が必須だが、
+それはAPIから設定できずコンソール専用（プラン制限の可能性もある）のため、直接方式にした
+（2026-08-21 実証済み: osslsigncode で署名者・ダイジェスト一致を確認）。
 
 **必要な設定**（リポジトリ Settings > Secrets and variables > Actions）:
 
 | 種別 | 名前 | 値 |
 |------|------|-----|
-| Secret | `SIGNPATH_ORG_ID` | SignPath 組織ID（例: `cf2997b6-...`） |
+| Secret | `SIGNPATH_ORG_ID` | SignPath 組織ID |
 | Secret | `SIGNPATH_API_TOKEN` | SignPath プロジェクトの API トークン |
 | Variable | `SIGNPATH_PROJECT_SLUG` | `shineos-local-ai`（APIで作成済み・設定済み） |
-| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | 署名ポリシーのスラッグ（コンソールで作成後に設定） |
+| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | `ShineosLocalAI-SigningPolicy`（コンソールで作成済み） |
 
-**SignPath側の設定状況（2026-08-20）**:
-- プロジェクト `Shineos Local AI`（slug: `shineos-local-ai`）は API で作成済み
+**SignPath側の設定状況（2026-08-21）**:
+- プロジェクト `Shineos Local AI`（slug: `shineos-local-ai`）— APIで作成済み
 - アーティファクト設定 `initial`（既定・有効）: `ShineosLocalAI-Setup-*.exe` を Authenticode 署名
-- **証明書と署名ポリシーは SignPath コンソールでのみ作成可能**（API未公開のため）。
-  コンソールで「Certificates → 自己署名テスト証明書の作成」→「Project → Signing Policies → 追加（証明書とSubmitterを選択）」を行い、
-  GitHub の Variable `SIGNPATH_SIGNING_POLICY_SLUG` にポリシースラッグ（例: `test-signing`）を設定する
+- 自己署名テスト証明書（`Shineos Inc.`・RSA4096・2029年まで）— コンソールで作成済み
+- 署名ポリシー `ShineosLocalAI-SigningPolicy` — コンソールで作成済み（Submitter: 管理者）
 
-**スラッグの確認方法**: SignPath コンソール（app.signpath.io）→ プロジェクトの設定画面にプロジェクトスラッグ、Signing Policies 画面にポリシースラッグが表示される。
-
-**署名フロー**（workflow 内）:
+**署名フロー**（workflow 内の `sign_with_signpath.ps1`）:
 1. `ISCC.exe` でビルド（未署名）
-2. `actions/upload-artifact` で署名対象をアップロード
-3. SignPath アクションが署名リクエストを送信 → 完了を待機（最大600秒）→ 署名済みexeを `signed/` に保存
-4. 署名済みexeで未署名exeを差し替え → GitHub Releases にアップロード
+2. `POST /SigningRequests/SubmitWithArtifact` で署名リクエスト送信
+3. 完了までポーリング（最大600秒・マルウェアスキャン含む）
+4. `GET .../SignedArtifact` で署名済みexeを取得 → 未署名exeと差し替え → Releases にアップロード
 
 **注意**:
-- `artifact-configuration-slug` 未指定時はプロジェクトの既定を使用。署名結果がアーカイブ（zip等）で返る場合は `skip-decompress: false` に変更すること
+- **テスト証明書（自己署名）はOS・ブラウザから信頼されない**（SmartScreenは「発行元不明」表示）。
+  パイプライン検証用。一般公開リリースには**実コード署名証明書**（SignPathのCSR発行→CA購入→アップロード）が必要
 - API トークンをチャット等で共有した場合は、SignPath コンソールで**ローテーション**を推奨
-- 署名ポリシーが手動承認設定の場合は `wait-for-completion-timeout-in-seconds`（600秒）を超えるとタイムアウトする
+- マルウェアスキャンが各署名で実行されるため、完了まで数十秒〜数分かかる
 
 ---
 
