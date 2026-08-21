@@ -129,9 +129,9 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
-{ PowerShell を非同期起動し、進捗ファイル（{tmp}\progress.txt）をポーリングして
-  最終行を進捗ページにリアルタイム表示する。
-  スクリプト側が最後に「PROGRESS_DONE:<exit code>」を書いて完了を知らせる }
+// PowerShell を非同期起動し、進捗ファイル（{tmp} の progress.txt）をポーリングして
+// 最終行を進捗ページにリアルタイム表示する。
+// スクリプト側が最後に「PROGRESS_DONE:<exit code>」を書いて完了を知らせる
 function RunStepLive(StepTitle, Script, Params, ProgressFile: String; var ResultCode: Integer): Boolean;
 var
   Content, LastLine: String;
