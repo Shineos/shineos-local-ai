@@ -44,8 +44,12 @@ if ($Mode -eq 'models') {
 
     Log "pulling $Model"
     Progress "downloading model $Model (3.4GB)..."
+    # 外部コマンドの stderr 出力（進捗）で NativeCommandError が発生しないよう
+    # キャプチャ中のみ ErrorActionPreference を緩める
+    $ErrorActionPreference = 'Continue'
     $pullOut = & $ollama pull $Model 2>&1 | ForEach-Object { Progress $_; $_ }
     $pullCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop
     if ($pullCode -ne 0) {
         $pullOut | ForEach-Object { Log "ollama-pull: $_" }
         $errLog = Join-Path $AppDir 'logs\ollama.err.log'
@@ -60,8 +64,10 @@ if ($Mode -eq 'models') {
 
     Log "pulling $EmbeddingModel"
     Progress "downloading embedding model $EmbeddingModel (274MB)..."
+    $ErrorActionPreference = 'Continue'
     $pullOut2 = & $ollama pull $EmbeddingModel 2>&1 | ForEach-Object { Progress $_; $_ }
     $pullCode2 = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop
     if ($pullCode2 -ne 0) {
         $pullOut2 | ForEach-Object { Log "ollama-pull: $_" }
         throw "embedding model pull failed: $EmbeddingModel (exit $pullCode2)"
