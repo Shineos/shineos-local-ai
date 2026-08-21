@@ -54,9 +54,20 @@ if ($needUpgrade) {
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
         if ($size -lt 100MB) { throw "OllamaSetup download looks invalid (${size} bytes) - proxy/block page の可能性" }
     }
+    # 旧バージョンのOllamaプロセス/サービスが動作していると、実行中ファイルを
+    # 置換できずインストールが失敗する（ERROR_ACCESS_DENIED = exit code 5）ため先に停止する
+    Log 'stopping old Ollama services/processes before upgrade'
+    & sc.exe stop ShineosOllama 2>$null | Out-Null
+    & sc.exe stop Ollama 2>$null | Out-Null
+    Get-Process -Name ollama -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+
     Log 'upgrading Ollama (silent)'
     $p = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
     if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
+        # 診断情報（実行中プロセス・サービスの状態）
+        Get-Process -Name ollama -ErrorAction SilentlyContinue | ForEach-Object { Log "ollama process running: $($_.Path)" }
+        Get-Service -Name Ollama, ShineosOllama -ErrorAction SilentlyContinue | ForEach-Object { Log "service state: $($_.Name) = $($_.Status)" }
         throw "OllamaSetup exit code $($p.ExitCode)"
     }
     $ollamaExe = Get-OllamaExe
