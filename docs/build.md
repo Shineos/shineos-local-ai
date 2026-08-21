@@ -365,9 +365,29 @@ GitHubコネクタ（Trusted Build System）方式は組織へのコネクタ設
 
 **注意**:
 - **テスト証明書（自己署名）はOS・ブラウザから信頼されない**（SmartScreenは「発行元不明」表示）。
-  パイプライン検証用。一般公開リリースには**実コード署名証明書**（SignPathのCSR発行→CA購入→アップロード）が必要
+  パイプライン検証用。一般公開リリースには**実コード署名証明書**が必要
 - API トークンをチャット等で共有した場合は、SignPath コンソールで**ローテーション**を推奨
 - マルウェアスキャンが各署名で実行されるため、完了まで数十秒〜数分かかる
+
+### 10.3 実コード署名証明書への移行（本番リリース用）
+
+SmartScreenで「発行元: Shineos Inc.」と認識されるようにする手順。
+
+**ユーザー（コンソール・CA）のみで実施可能なステップ**（証明書操作はAPI未公開のため）:
+
+1. SignPathコンソール → **Certificates → Add certificate → CSR（certificate signing request）を発行**
+   （秘密鍵はSignPathのHSM上に生成される。CSRファイルをダウンロード）
+2. コード署名証明書をCAから購入（OV: 年額2〜4万円目安 / EV: 年額4〜8万円目安。DigiCert・SSL.com・Sectigo等。
+   会社情報の確認が必要で発行に1〜5日程度）
+3. 発行された証明書を SignPath コンソール → **Certificates → Import** でアップロード
+
+**証明書ができた後のステップ（APIで実施可能・自動化）**:
+
+4. 実証明書のslugを確認 → 署名ポリシー `release-signing` を作成（Submitterは既存ポリシーと同一）
+5. GitHub Variables の `SIGNPATH_SIGNING_POLICY_SLUG` を `release-signing` に切替
+6. タグpush → 署名済みexeを osslsigncode で検証（発行元がCAのものになっていることを確認）
+
+**推奨**: OV証明書で十分（発行元表示＋SmartScreenの評判向上）。EVは評判の初期獲得に有利だが費用が高い。
 
 ---
 
