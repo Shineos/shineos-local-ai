@@ -101,7 +101,7 @@ try {
         $size = (Get-Item $nupkg).Length
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
         Progress "download complete: $([math]::Round($size / 1MB, 1)) MB"
-        if ($size -lt 15MB) { throw "python download looks invalid (${size} bytes) - proxy/block page の可能性" }
+        if ($size -lt 10MB) { throw "python download looks invalid (${size} bytes) - proxy/block page の可能性" }
     }
     else {
         Log "package already exists: $nupkg (skip download)"
