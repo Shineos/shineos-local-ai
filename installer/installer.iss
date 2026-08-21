@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.7"
+#define MyAppVersion "1.0.8"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -194,7 +194,7 @@ begin
     end;
 
     ProgressPage.SetProgress(20, 100);
-    ProgressPage.SetText('Ollama（AI実行エンジン）をインストール中...', '本体1.5GBのダウンロードのため10〜40分かかることがあります');
+    ProgressPage.SetText('Ollama（AI実行エンジン）をインストール中...', '古いバージョンがあれば最新に更新します（本体1.5GBのダウンロードのため10〜40分）');
     if not RunPowerShell('setup_ollama.ps1',
         '-AppDir "' + AppDir + '" -TmpDir "' + ExpandConstant('{tmp}') + '"', RC)
        or (RC <> 0) then

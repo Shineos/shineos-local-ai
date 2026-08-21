@@ -26,9 +26,26 @@ try {
 Log '--- setup_ollama start ---'
 $ollamaExe = Get-OllamaExe
 
-if (-not $ollamaExe) {
+# --- 古いバージョンは最新に更新する ---
+# （旧クライアントは新しいモデル（qwen3.5系）のマニフェストを取得できないため。
+#   例: 0.13.5 のような旧版では pull が即失敗する）
+$needUpgrade = $false
+if ($ollamaExe) {
+    $ver = & $ollamaExe --version 2>&1
+    Log "ollama version: $ver"
+    if ($ver -match 'version is (\d+)\.(\d+)') {
+        if ([int]$Matches[1] -eq 0 -and [int]$Matches[2] -lt 30) { $needUpgrade = $true }
+    }
+    else { $needUpgrade = $true }
+}
+else { $needUpgrade = $true }
+
+if ($needUpgrade) {
     $installer = Join-Path $TmpDir 'OllamaSetup.exe'
     if (-not (Test-Path $installer)) {
+        if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
+            throw 'curl.exe not found (Windows 10 1803 以降が必要)'
+        }
         $url = 'https://github.com/ollama/ollama/releases/latest/download/OllamaSetup.exe'
         Log "downloading $url"
         & curl.exe -L --fail --retry 3 --connect-timeout 30 -o $installer $url
@@ -37,21 +54,31 @@ if (-not $ollamaExe) {
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
         if ($size -lt 100MB) { throw "OllamaSetup download looks invalid (${size} bytes) - proxy/block page の可能性" }
     }
-    Log 'installing Ollama (silent)'
+    Log 'upgrading Ollama (silent)'
     $p = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
     if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
         throw "OllamaSetup exit code $($p.ExitCode)"
     }
     $ollamaExe = Get-OllamaExe
+    if (-not $ollamaExe) { throw 'ollama.exe not found after installation' }
+    $ver = & $ollamaExe --version 2>&1
+    Log "ollama version after upgrade: $ver"
 }
-if (-not $ollamaExe) { throw 'ollama.exe not found after installation' }
+else {
+    Log 'ollama version is current (no upgrade needed)'
+}
 Log "ollama.exe: $ollamaExe"
-$ver = & $ollamaExe --version 2>&1
-Log "ollama version: $ver"
 
 # --- サービス確認（公式「Ollama」→ 無ければ NSSM フォールバック） ---
 $svc = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
 if ($svc) {
+    # 公式サービスがある場合は、以前のフォールバックサービスを削除（起動時競合防止）
+    $fbSvc = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
+    if ($fbSvc) {
+        Log 'removing old fallback service (ShineosOllama) to avoid conflict'
+        & sc.exe stop ShineosOllama 2>$null | Out-Null
+        & sc.exe delete ShineosOllama 2>$null | Out-Null
+    }
     Log 'service "Ollama" found: ensure auto start'
     & sc.exe config Ollama start= auto | Out-Null
     if ($svc.Status -ne 'Running') {
@@ -60,18 +87,27 @@ if ($svc) {
     }
 }
 else {
-    Log 'service "Ollama" not found: register NSSM fallback (ShineosOllama)'
-    $nssm = Join-Path $TmpDir 'nssm.exe'
-    if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
-    $logDir = Join-Path $AppDir 'logs'
-    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-    & $nssm install ShineosOllama $ollamaExe 'serve' | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'nssm install ShineosOllama failed' }
-    & $nssm set ShineosOllama Start SERVICE_AUTO_START | Out-Null
-    & $nssm set ShineosOllama AppStdout (Join-Path $logDir 'ollama.log') | Out-Null
-    & $nssm set ShineosOllama AppStderr (Join-Path $logDir 'ollama.err.log') | Out-Null
-    Log 'starting service "ShineosOllama"'
-    & sc.exe start ShineosOllama | Out-Null
+    $fbSvc = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
+    if (-not $fbSvc) {
+        Log 'service "Ollama" not found: register NSSM fallback (ShineosOllama)'
+        $nssm = Join-Path $TmpDir 'nssm.exe'
+        if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
+        $logDir = Join-Path $AppDir 'logs'
+        New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+        & $nssm install ShineosOllama $ollamaExe 'serve' | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'nssm install ShineosOllama failed' }
+        & $nssm set ShineosOllama Start SERVICE_AUTO_START | Out-Null
+        & $nssm set ShineosOllama AppStdout (Join-Path $logDir 'ollama.log') | Out-Null
+        & $nssm set ShineosOllama AppStderr (Join-Path $logDir 'ollama.err.log') | Out-Null
+    }
+    else {
+        Log 'service "ShineosOllama" already exists: ensure auto start'
+        & sc.exe config ShineosOllama start= auto | Out-Null
+    }
+    if ($fbSvc.Status -ne 'Running') {
+        Log 'starting service "ShineosOllama"'
+        & sc.exe start ShineosOllama | Out-Null
+    }
 }
 
 # --- API 起動待ち（最大60秒） ---
