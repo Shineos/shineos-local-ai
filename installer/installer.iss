@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.20"
+#define MyAppVersion "1.0.21"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -227,6 +227,13 @@ begin
   if CurPageID = wpReady then
   begin
     AppDir := ExpandConstant('{app}');
+    if not IsAdminLoggedOn then
+    begin
+      MsgBox('インストールには管理者権限が必要です。' + #13#10 +
+             'exeを右クリック →「管理者として実行」を選択してやり直してください。', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
     if ModelPage.SelectedValueIndex = 1 then
       SelectedModel := 'qwen3.5:2b'
     else

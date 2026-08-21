@@ -1,6 +1,8 @@
 ﻿# run_all.ps1 - 長いセットアップ手順を1つのコンソールで順に実行するラッパー
 # - 各ステップの開始・成功・失敗をコンソールと install.log の両方に記録する
 # - いずれかのステップが失敗したら、そこで停止して終了コードを返す
+# - 失敗時は実際のエラー内容（例外メッセージ・出力末尾）を step_error.txt に書き、
+#   インストーラのエラーダイアログに表示する（install.logが作れない状況でも原因が分かる）
 # 終了コード: 0 = 全ステップ成功 / 非0 = 失敗
 param(
     [string]$AppDir,
@@ -13,13 +15,31 @@ param(
 $ErrorActionPreference = 'Continue'
 $LogFile = Join-Path $AppDir 'install.log'
 $here = $PSScriptRoot
-# 前回の失敗情報をクリア
-'' | Out-File -FilePath (Join-Path $TmpDir 'step_error.txt') -Encoding ascii -ErrorAction SilentlyContinue
+$ErrorFile = Join-Path $TmpDir 'step_error.txt'
+
+function Save-Error {
+    param([string]$Message)
+    $Message | Out-File -FilePath $ErrorFile -Encoding ascii
+}
+
+# --- 事前チェック: アプリフォルダに書き込めるか（作成できない場合は即座に原因を報告） ---
+try {
+    New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+    $testFile = Join-Path $AppDir '.write_test'
+    Set-Content -Path $testFile -Value 'ok' -ErrorAction Stop
+    Remove-Item $testFile -ErrorAction SilentlyContinue
+}
+catch {
+    $msg = "FATAL: cannot write to $AppDir - $($_.Exception.Message)"
+    Save-Error $msg
+    Write-Output $msg
+    exit 90
+}
 
 function Log-Console {
     param([string]$Message)
     Write-Output $Message
-    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8
+    try { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message" | Out-File -FilePath $LogFile -Append -Encoding utf8 } catch { }
 }
 
 function Invoke-Step {
@@ -29,12 +49,14 @@ function Invoke-Step {
         [string[]]$Params
     )
     Log-Console "===== STEP START: $Name ====="
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here $Script) @Params
+    $outFile = Join-Path $TmpDir 'step_output.txt'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here $Script) @Params 2>&1 | Tee-Object -FilePath $outFile
     $code = $LASTEXITCODE
     if ($code -ne 0) {
         Log-Console "===== STEP FAILED: $Name (exit $code) ====="
-        # インストーラのエラーダイアログに表示するため、失敗情報をファイルに残す
-        "STEP FAILED: $Name (exit $code)" | Out-File -FilePath (Join-Path $TmpDir 'step_error.txt') -Encoding ascii
+        $tail = Get-Content $outFile -Tail 15 -ErrorAction SilentlyContinue
+        Save-Error ("STEP FAILED: $Name (exit $code)`n" + ($tail -join "`n"))
+        Get-Content $outFile -Tail 15 -ErrorAction SilentlyContinue | ForEach-Object { Log-Console "  | $_" }
         exit $code
     }
     Log-Console "===== STEP OK: $Name ====="
