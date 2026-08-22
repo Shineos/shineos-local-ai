@@ -130,19 +130,9 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 - 軽量サーバー: `%USERPROFILE%\shineos-qa-out\`（各ユーザーのホームディレクトリ配下。環境変数 `FILEGEN_OUT` で変更可）
 - MCPO: `{app}\data\mcpo_output\`
 
-## 管理者向けの推奨設定（要・管理者権限）
+## 推奨設定（すべてインストーラで自動適用・コマンド操作は不要）
 
-以下の設定はインストーラが自動適用します。個別に再適用する場合は管理者PowerShellで:
-
-```powershell
-# 1. Ollama の性能チューニング（KV量子化 q8_0・Flash Attention・モデル常駐制限）
-#    - 応答高速化とメモリ節約のため、インストール時に自動適用済み
-& "C:\Program Files\ShineosQA\setup_ollama.ps1" -AppDir "C:\Program Files\ShineosQA" -TmpDir $env:TEMP
-
-# 2. ナレッジ（社内文書）の再登録
-#    - {app}\knowledge フォルダに PDF・Markdown を追加した後に実行
-& "C:\Program Files\ShineosQA\setup_knowledge.ps1"
-```
+推奨設定は**すべてインストーラが自動適用**するため、PowerShell などのコマンドを実行する必要はありません。
 
 ### インストール時に自動適用される設定
 
@@ -155,7 +145,15 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 | ナレッジ | `{app}\knowledge` フォルダの PDF/Markdown を自動登録（サブフォルダ単位でコレクション分類） |
 | その他 | 日本語UI・バージョンアップ通知無効化・閉じたときのモデルアンロード |
 
-### 推奨される追加設定（Open WebUI 管理画面・要管理者権限）
+### ナレッジを追加した場合（ダブルクリックだけで再登録）
+
+1. `C:\Program Files\ShineosQA\knowledge` フォルダに PDF・Markdown を追加
+2. **「`C:\Program Files\ShineosQA\ナレッジ再登録.bat`」をダブルクリック**
+3. 管理者権限の確認画面で「はい」をクリック → 自動で再登録されます
+
+（ファイル名や文書の先頭に【経費精算】などのタグを付けると検索精度が向上します）
+
+### 推奨される追加設定（Open WebUI 管理画面・コマンド不要）
 
 - **コンテキスト圧縮**: 管理画面 → 設定 → チャット → コンテキスト圧縮を有効化（長文チャットのメモリ節約・応答安定化）
 - **RAG 関連の詳細調整**: 管理画面 → 設定 → ドキュメント（検索結果の表示件数・関連性しきい値など）

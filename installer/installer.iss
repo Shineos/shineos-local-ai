@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "社内知恵袋"
-#define MyAppVersion "1.0.33"
+#define MyAppVersion "1.0.34"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -72,6 +72,8 @@ Source: "..\tools\mcpo\requirements.txt"; DestDir: "{app}\tools\mcpo"; Flags: ig
 Source: "..\scripts\start_openwebui.bat";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\scripts\configure_model.ps1";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\scripts\setup_knowledge.ps1";  DestDir: "{app}";       Flags: ignoreversion
+; ナレッジ再登録ツール（ダブルクリックだけで再登録・コマンド操作不要）
+Source: "..\scripts\ナレッジ再登録.bat";   DestDir: "{app}";       Flags: ignoreversion
 Source: "..\assets\app.ico";               DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\vendor\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}";     Flags: ignoreversion
 ; WebView2 ラッパーアプリ（URL入力不要・閉じたらサービス停止）
@@ -94,6 +96,7 @@ Type: filesandordirs; Name: "{app}\knowledge"
 Type: files; Name: "{app}\install.log"
 Type: files; Name: "{app}\configure_model.ps1"
 Type: files; Name: "{app}\setup_knowledge.ps1"
+Type: files; Name: "{app}\ナレッジ再登録.bat"
 Type: files; Name: "{userdesktop}\ShineosQA-はじめに.txt"
 
 [Code]
@@ -291,7 +294,7 @@ begin
        '・社内Q&A（ナレッジ検索）: ' + AppDir + '\knowledge フォルダの社内文書（PDF・Markdown）を自動登録済み。' + #13#10 +
        '　質問すると、根拠となった文書名・該当箇所つきで回答します' + #13#10 +
        '・用途別プリセット: チャットのモデル選択で「経費精算ガイド」「ITヘルプデスク」に切り替えられます' + #13#10 +
-       '・ナレッジの追加: knowledge フォルダに文書を置き、setup_knowledge.ps1 を再実行' + #13#10 +
+       '・ナレッジの追加: knowledge フォルダに文書を置き、「ナレッジ再登録.bat」をダブルクリック' + #13#10 +
        '　（ファイル名や文書の先頭に【経費精算】などのタグを付けると検索精度が向上します）' + #13#10 +
        '・ナレッジに無いことは「該当する記載がありません」と回答します（ハルシネーション抑制）' + #13#10 +
        '・Web検索（オプション）: チャットのWeb検索ボタンをONにすると利用できます（DuckDuckGo・APIキー不要）' + #13#10 +
@@ -349,7 +352,7 @@ begin
         if not (RunPowerShell('setup_knowledge.ps1', '-BaseUrl "http://localhost:' + IntToStr(SelectedPort) + '" -KnowledgeDir "' + AppDir + '\knowledge" -LogFile "' + AppDir + '\logs\setup_knowledge.log"', RC) and (RC = 0)) then
           MsgBox('ナレッジ登録に失敗しました。' + #13#10 +
                  'インストール後に ' + AppDir + '\knowledge フォルダに文書を追加し、' + #13#10 +
-                 AppDir + '\setup_knowledge.ps1 を再実行してください。' + #13#10 +
+                 '「' + AppDir + '\ナレッジ再登録.bat」をダブルクリックしてください。' + #13#10 +
                  'ログ: ' + AppDir + '\logs\setup_knowledge.log', mbInformation, MB_OK);
       end;
 
