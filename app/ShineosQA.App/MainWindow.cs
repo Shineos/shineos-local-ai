@@ -34,10 +34,12 @@ namespace ShineosQA
 
         readonly WebView2 webView = new WebView2();
         readonly Grid loadingPanel;
+        readonly Grid guidePanel;
         readonly System.Windows.Shapes.Path spinner;
         readonly TextBlock overlayTitle;
         readonly TextBlock overlayMessage;
         readonly Button retryButton;
+        readonly string firstRunFile;
         bool closing;
 
         public MainWindow()
@@ -56,6 +58,8 @@ namespace ShineosQA
             }
             catch { }
             Port = port;
+            // 初回起動ガイドのフラグファイル（{app}\app 配下。アンインストール時に削除される）
+            firstRunFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "first_run.txt");
             // ?lang=ja-JP で Open WebUI の UI を日本語表示にする
             // （ブラウザ言語の自動検出を上書きして確実に日本語を表示する）
             AppUrl = "http://localhost:" + Port + "/?lang=ja-JP";
@@ -150,10 +154,85 @@ namespace ShineosQA
             center.Children.Add(retryButton);
             loadingPanel.Children.Add(center);
 
+            // 初回起動時の「はじめにガイド」（非エンジニア向け・3ステップ）
+            // 初回起動時のみ表示し、「はじめる」で閉じる。以降は表示しない
+            guidePanel = new Grid
+            {
+                Background = Brushes.White,
+                Visibility = Visibility.Collapsed
+            };
+            var guideCenter = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 620,
+                Margin = new Thickness(40, 0, 40, 0)
+            };
+            guideCenter.Children.Add(new TextBlock
+            {
+                Text = "社内知恵袋へようこそ",
+                FontSize = 28,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+            guideCenter.Children.Add(new TextBlock
+            {
+                Text = "社内の規定・マニュアルから、根拠つきで回答する社内Q&Aツールです。",
+                FontSize = 14,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 28)
+            });
+            AddGuideStep(guideCenter, "1", "質問する",
+                "画面下の入力欄に「経費精算の手順は？」のように入力して送信します。\n回答には根拠（文書名・該当箇所）が付きます。");
+            AddGuideStep(guideCenter, "2", "資料を追加する",
+                "画面左の「ナレッジ」メニューから、PDF やマニュアルをドラッグ＆ドロップで追加できます。");
+            AddGuideStep(guideCenter, "3", "モデルを切り替える",
+                "画面右上のモデル選択で「経費精算ガイド」「ITヘルプデスク」に切り替えられます。");
+            // 次回からガイドを表示しないためのチェックボックス（チェック時のみフラグを作成）
+            var guideCheckbox = new CheckBox
+            {
+                Content = "次回からこの案内を表示しない",
+                FontSize = 13,
+                IsChecked = true,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 14, 0, 0),
+                Foreground = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44))
+            };
+            guideCenter.Children.Add(guideCheckbox);
+            var guideButton = new Button
+            {
+                Content = "はじめる",
+                FontSize = 17,
+                FontWeight = FontWeights.SemiBold,
+                Padding = new Thickness(48, 10, 48, 10),
+                Margin = new Thickness(0, 30, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(0x2B, 0x5C, 0xE3)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0)
+            };
+            guideButton.Click += (s, e) =>
+            {
+                // チェック時のみ初回起動フラグを記録（次回からガイドを表示しない）
+                if (guideCheckbox.IsChecked == true)
+                {
+                    try { File.WriteAllText(firstRunFile, "1"); } catch { }
+                }
+                HideGuide();
+            };
+            guideCenter.Children.Add(guideButton);
+            guidePanel.Children.Add(guideCenter);
+
             // WebView2 は初期状態で非表示（ローディング完了後に表示）
             webView.Visibility = Visibility.Collapsed;
 
             root.Children.Add(loadingPanel);
+            root.Children.Add(guidePanel);
             root.Children.Add(webView);
             Content = root;
 
@@ -186,6 +265,59 @@ namespace ShineosQA
         {
             webView.Visibility = Visibility.Visible;
             loadingPanel.Visibility = Visibility.Collapsed;
+        }
+
+        // 初回起動ガイド（非エンジニア向けの3ステップ説明）を表示する
+        void ShowGuide()
+        {
+            loadingPanel.Visibility = Visibility.Collapsed;
+            guidePanel.Visibility = Visibility.Visible;
+            webView.Visibility = Visibility.Collapsed;
+        }
+
+        void HideGuide()
+        {
+            guidePanel.Visibility = Visibility.Collapsed;
+            webView.Visibility = Visibility.Visible;
+        }
+
+        void AddGuideStep(StackPanel parent, string number, string title, string desc)
+        {
+            var step = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
+            var header = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            header.Children.Add(new TextBlock
+            {
+                Text = number,
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                Background = new SolidColorBrush(Color.FromRgb(0x2B, 0x5C, 0xE3)),
+                Padding = new Thickness(12, 2, 12, 2),
+                Margin = new Thickness(0, 0, 10, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            header.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 17,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            step.Children.Add(header);
+            step.Children.Add(new TextBlock
+            {
+                Text = desc,
+                FontSize = 13.5,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(37, 0, 0, 0)
+            });
+            parent.Children.Add(step);
         }
 
         void Log(string msg)
@@ -387,7 +519,12 @@ namespace ShineosQA
                 return;
             }
 
-            HideLoading();
+            // 初回起動時は「はじめにガイド」を表示（WebView2 は裏で読み込みを進める）
+            Log("first_run check: " + firstRunFile + " exists=" + File.Exists(firstRunFile));
+            if (File.Exists(firstRunFile))
+                HideLoading();
+            else
+                ShowGuide();
             await webView.EnsureCoreWebView2Async(null);
             webView.Source = new Uri(AppUrl);
         }
