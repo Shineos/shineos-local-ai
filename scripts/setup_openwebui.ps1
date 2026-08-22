@@ -8,7 +8,7 @@ param(
     [string]$AppDir,
     [string]$Mode,
     [string]$Model = 'qwen2.5:7b',
-    [string]$EmbeddingModel = 'nomic-embed-text',
+    [string]$EmbeddingModel = 'bge-m3',
     [string]$OpenWebuiVersion = '0.11.0',
     [string]$ProgressFile = ''
 )
@@ -61,6 +61,10 @@ if ($Mode -eq 'models') {
     }
     Log "pulled $Model"
     Progress "model $Model downloaded"
+    # 注: qwen3系の思考モード無効化は Modelfile では行わない（Ollama が
+    # enable_thinking パラメータをサポートしていないため）。思考モード対応
+    # モデルは configure_model.ps1 が Open WebUI のモデル設定経由で
+    # think:false を適用する。
 
     Log "pulling $EmbeddingModel"
     Progress "downloading embedding model $EmbeddingModel (274MB)..."
@@ -112,6 +116,11 @@ elseif ($Mode -eq 'app') {
     Progress 'installing open-webui...'
     & $venvPython -m pip install "open-webui==$OpenWebuiVersion"
     if ($LASTEXITCODE -ne 0) { throw 'open-webui install failed' }
+
+    # ファイル生成ツールサーバー用ライブラリ（PDF/PPTX/Word 生成）
+    Log 'installing file generation libraries'
+    & $venvPython -m pip install reportlab python-pptx python-docx openpyxl py7zr markdown2 beautifulsoup4 emoji "mcp<2"
+    if ($LASTEXITCODE -ne 0) { throw 'file generation libraries install failed' }
 
     Log 'app install done'
     Progress 'open-webui installed'

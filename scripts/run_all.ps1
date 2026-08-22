@@ -8,7 +8,7 @@ param(
     [string]$AppDir,
     [string]$TmpDir,
     [string]$PythonVersion = '3.12.10',
-    [string]$Model = 'qwen2.5:7b',
+    [string]$Model = 'qwen2.5:3b',
     [string]$OpenWebuiVersion = '0.11.0'
 )
 

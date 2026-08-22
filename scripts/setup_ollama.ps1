@@ -81,7 +81,9 @@ if ($needUpgrade) {
         $url = 'https://github.com/ollama/ollama/releases/latest/download/OllamaSetup.exe'
         Log "downloading $url"
         Progress 'downloading Ollama (1.5GB)...'
-        & curl.exe -L --fail --retry 3 --connect-timeout 30 -o $installer $url
+        # -sS: 進捗メーターを抑制（PowerShell 5.1 は stderr 出力をエラー扱いし、
+        # ユーザーに「エラー」と誤解させるため。エラー時のみ表示する）
+        & curl.exe -sS -L --fail --retry 3 --connect-timeout 30 -o $installer $url
         if ($LASTEXITCODE -ne 0) { throw "OllamaSetup download failed (curl exit $LASTEXITCODE)" }
         $size = (Get-Item $installer).Length
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
@@ -151,12 +153,91 @@ function Wait-OllamaApi {
     return $false
 }
 
-# 1) 既に起動していれば何もしない
-if (Test-OllamaApi) {
-    Log 'Ollama API already running'
+# --- 低スペック機向け性能チューニング（メモリ最適化＋応答高速化） ---
+# 設定はすべて冪等。システム環境変数（公式サービス・直接起動に効く）と
+# NSSMフォールバックサービスへの直接注入の両方を行い、再起動で反映する
+function Set-OllamaTuning {
+    $tuning = [ordered]@{
+        'OLLAMA_MAX_LOADED_MODELS' = '1'    # LLM/埋め込みモデルの同時常駐を防ぎRAMを節約
+        'OLLAMA_KV_CACHE_TYPE'     = 'q8_0' # KVキャッシュ量子化でメモリ約半減（品質影響ほぼなし）
+        'OLLAMA_FLASH_ATTENTION'   = '1'    # 長文コンテキストの高速化（KV量子化の前提条件）
+        'OLLAMA_KEEP_ALIVE'        = '10m'  # モデルを10分常駐させ連続利用の応答を高速化
+        'OLLAMA_NUM_PARALLEL'      = '1'    # 単一ユーザー用途。並列数を抑えてメモリを節約
+    }
+    Log 'applying Ollama performance tuning (env vars)'
+    foreach ($k in $tuning.Keys) {
+        [Environment]::SetEnvironmentVariable($k, $tuning[$k], 'Machine')
+    }
+    # NSSMフォールバックサービスにも直接注入（システム環境変数の再読込を待たず確実に反映）
+    $fbSvc2 = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
+    if ($fbSvc2) {
+        $nssm2 = Join-Path $TmpDir 'nssm.exe'
+        if (Test-Path $nssm2) {
+            $envList = @()
+            foreach ($k in $tuning.Keys) { $envList += ('"' + $k + '=' + $tuning[$k] + '"') }
+            & $nssm2 set ShineosOllama AppEnvironmentExtra $envList | Out-Null
+        }
+    }
+    # 環境変数はプロセス起動時に読まれるため、サービスを再起動して反映する
+    Log 'restarting Ollama to apply tuning'
+    & sc.exe stop Ollama 2>$null | Out-Null
+    & sc.exe stop ShineosOllama 2>$null | Out-Null
+    Get-Process -Name ollama -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+    $official = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
+    if ($official) {
+        & sc.exe config Ollama start= auto | Out-Null
+        & sc.exe start Ollama | Out-Null
+    }
+    elseif ($fbSvc2) {
+        & sc.exe start ShineosOllama | Out-Null
+    }
+    else {
+        Start-Process -FilePath $ollamaExe -ArgumentList 'serve' -WindowStyle Hidden
+    }
+    if (-not (Wait-OllamaApi -Seconds 30)) {
+        Log 'WARNING: Ollama did not become ready after tuning restart'
+    }
+}
+
+function Complete-OllamaSetup {
+    Set-OllamaTuning
+    Log 'Ollama ready'
     Progress 'Ollama ready'
     Progress 'PROGRESS_DONE:0'
     exit 0
+}
+
+# 1) 既に起動していればサービス状態を確認し、未登録なら NSSM フォールバックを登録する
+# （API が動いているだけでは PC 再起動後に自動起動しないため。
+#   OllamaSetup が serve を直接起動した場合などにサービスが無いことがある）
+if (Test-OllamaApi) {
+    Log 'Ollama API already running'
+    $svc = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
+    $fbSvc = Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue
+    if (-not $svc -and -not $fbSvc) {
+        Log 'no Ollama service registered - registering NSSM fallback (ShineosOllama)'
+        Progress 'registering Ollama service...'
+        $nssm = Join-Path $TmpDir 'nssm.exe'
+        if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
+        $logDir = Join-Path $AppDir 'logs'
+        New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+        # 既存プロセスを停止してから登録（ポート競合防止）
+        Get-Process -Name 'ollama','ollama app' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        & $nssm install ShineosOllama $ollamaExe 'serve' | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'nssm install ShineosOllama failed' }
+        & $nssm set ShineosOllama Start SERVICE_AUTO_START | Out-Null
+        & $nssm set ShineosOllama AppStdout (Join-Path $logDir 'ollama.log') | Out-Null
+        & $nssm set ShineosOllama AppStderr (Join-Path $logDir 'ollama.err.log') | Out-Null
+        & $nssm start ShineosOllama | Out-Null
+        if (Wait-OllamaApi -Seconds 30) {
+            Log 'Ollama ready (NSSM fallback registered)'
+        } else {
+            Log 'WARNING: Ollama API did not become ready after NSSM registration'
+        }
+    }
+    Complete-OllamaSetup
 }
 
 $svc = Get-Service -Name 'Ollama' -ErrorAction SilentlyContinue
@@ -176,9 +257,7 @@ if ($svc) {
             & sc.exe delete ShineosOllama 2>$null | Out-Null
         }
         Log 'Ollama ready (official service)'
-        Progress 'Ollama ready'
-        Progress 'PROGRESS_DONE:0'
-        exit 0
+        Complete-OllamaSetup
     }
     Log 'official service did not become ready - trying fallback'
 }
@@ -205,9 +284,7 @@ if ((Get-Service -Name 'ShineosOllama' -ErrorAction SilentlyContinue).Status -ne
 }
 if (Wait-OllamaApi -Seconds 20) {
     Log 'Ollama ready (fallback service)'
-    Progress 'Ollama ready'
-    Progress 'PROGRESS_DONE:0'
-    exit 0
+    Complete-OllamaSetup
 }
 
 # 4) 最終フォールバック: サービスが機能しない場合はプロセスを直接起動
@@ -216,9 +293,7 @@ Progress 'starting Ollama directly...'
 Start-Process -FilePath $ollamaExe -ArgumentList 'serve' -WindowStyle Hidden
 if (Wait-OllamaApi -Seconds 15) {
     Log 'Ollama ready (direct process)'
-    Progress 'Ollama ready'
-    Progress 'PROGRESS_DONE:0'
-    exit 0
+    Complete-OllamaSetup
 }
 
 # 5) 診断情報を記録して失敗

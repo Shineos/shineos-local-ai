@@ -86,17 +86,17 @@ Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカ
 
 ### 3.1 選定結果
 
-| | **既定: qwen2.5:3b** | 軽量オプション: qwen2.5:1.5b |
-|---|---|---|
-| サイズ | 1.9GB | 1.0GB |
-| 8GB機 | 快適 | 快適 |
-| 16GB以上 | 快適 | — |
-| ライセンス | Apache 2.0（商用可・無償・同梱可） | 同左 |
-| 特徴 | CPU専用PCで1秒前後の高速応答・日本語実用レベル | 最軽量・さらに高速 |
+| | **既定: qwen2.5:3b** | 高品質: qwen2.5:7b | 軽量: qwen2.5:1.5b |
+|---|---|---|---|
+| サイズ | 1.9GB | 4.7GB | 1.0GB |
+| 8GB機 | 快適 | 非推奨 | 快適 |
+| 16GB以上 | 快適 | 快適 | — |
+| ライセンス | Apache 2.0（商用可・無償・同梱可） | 同左 | 同左 |
+| 特徴 | CPU専用PCで1秒前後の高速応答・日本語実用レベル | 日本語品質が高い | 最軽量・さらに高速 |
 
 選定根拠:
-1. **業務利用のライセンス**: qwen2.5系は Apache 2.0（Ollamaレジストリ・HuggingFaceで確認）。商用利用・再配布・同梱が無償で可能
-2. **CPU専用PCでの実測**: qwen2.5:3b は「日本の首都は？」に0.7〜1.6秒で正答。qwen3:4b（思考型）は回答まで30〜70秒、qwen3.5:4b は思考が止まらず**回答不能**（テンプレート欠如＋presence_penalty=1.5）のため採用不可と判定（2026-08-21実機検証）
+1. **業務利用のライセンス**: qwen2.5系・qwen3.5系は Apache 2.0（Ollamaレジストリ・HuggingFaceで確認）。商用利用・再配布・同梱が無償で可能
+2. **CPU専用PCでの実測**: qwen2.5:3b は「日本の首都は？」に0.7〜1.6秒で正答。qwen3:4b（思考型）は思考モードがOllamaのテンプレートで無効化できず、回答まで30秒以上〜数百トークンの思考が続き**採用不可**。qwen3.5:4b は Open WebUI のモデル設定 API で `think:false` を適用すれば思考なしで回答することを実機で確認（reasoning_len: 0、約7.5t/s）したが、**選択肢をシンプルに保つため v1.0.31 で上級オプションを廃止し3択に整理**（2026-08-23）
 3. **日本語・性能**: qwen2.5系は小規模でも日本語QAの実用下限を満たす。業務利用は「文書検索→引用付き回答」の抽出型RAG QAを主用途と想定
 
 ### 3.2 検索エンジンの切替（SearXNG）
@@ -127,7 +127,8 @@ DuckDuckGo はレート制限（1時間あたりのリクエスト上限）が�
 | ヘルスチェック | `GET /health`（認証不要）→ 起動確認に使用 | — |
 | RAG | 内蔵RAG＋`RAG_EMBEDDING_ENGINE=ollama`でOllama埋め込みに切替可 → torch実行回避・自前RAGエンジン不要 | 自社RAGエンジン実装を廃止 |
 | Web検索 | `ENABLE_WEB_SEARCH` / `WEB_SEARCH_ENGINE` 環境変数が存在（ソース確認）。DuckDuckGoはAPIキー不要 | 「DuckDuckGo API」表記を修正（公式APIは存在しない） |
-| qwen2.5 | `qwen2.5:3b`=1.9GB / `qwen2.5:1.5b`=1.0GB がOllamaライブラリに存在。**Apache 2.0**。qwen3.5系は実機検証で回答不能のため不採用 | モデルをqwen3.5系→qwen2.5系に変更（v1.0.24） |
+| qwen2.5 / qwen3.5 | `qwen2.5:3b`=1.9GB / `qwen2.5:1.5b`=1.0GB / `qwen2.5:7b`=4.7GB がOllamaライブラリに存在。**Apache 2.0**。qwen3:4b は思考モード無効化不能のため不採用、qwen3.5:4b は think:false 適用で採用（v1.0.30） | モデルをqwen3系→qwen2.5系に変更（v1.0.24）、qwen3.5:4b を上級オプションとして追加（v1.0.30） |
+| ツール無効化 | Open WebUI はモデルに builtin ツール（write_note 等 34個）を提供する。**モデルがツール呼び出しを選ぶとチャットにテキスト回答が残らず「応答なし」になる**（2026-08-22 実機検証）。同名（id=base_model_id）のモデル設定は 0.10.x でマージされず無効化が効かないため、**別名カスタムモデル「Shineos Chat」**（base_model_id=実モデル）として builtinTools 全無効 + capabilities.tools=false + think:false を適用する | v1.0.30 で対応。DEFAULT_MODELS=Shineos Chat |
 | Ollama | `OllamaSetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART` 有効（winget実績）。公式DL URL 有効。MIT | — |
 | NSSM | 2.24・パブリックドメイン。`AppEnvironmentExtra KEY=VALUE` でサービスに環境変数注入可 | setx方式を廃止（環境変数汚染ゼロ） |
 

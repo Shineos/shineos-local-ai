@@ -32,8 +32,13 @@
 ## 使い方
 
 1. `ShineosLocalAI-Setup-<version>.exe` をダブルクリック（管理者権限を要求されます）
-2. AIモデルを選択（推奨: qwen2.5:7b / 標準: qwen2.5:3b / 軽量: qwen2.5:1.5b）
+2. AIモデルを選択
+   - **qwen2.5:3b（推奨・高速）**: 約1.9GB・8GBメモリ機でも快適（応答約1秒）
+   - **qwen2.5:7b（高品質）**: 約4.7GB・16GB以上のメモリ推奨
+   - **qwen2.5:1.5b（軽量）**: 約1GB・8GB機に最適・最速
 3. インストール完了後、デスクトップの「Shineos Local AI」をダブルクリックするとアプリ画面が開きます（URL入力不要・閉じるとサービスも停止）
+
+※ チャット画面では「Shineos Chat」というモデルが自動選択されます（ツール無効化・思考モード無効化済みの最適化モデル。インストール時に選択したモデルがベース）。
 
 詳細は [docs/user-guide.md](docs/user-guide.md) を参照してください。
 
@@ -51,6 +56,31 @@ shineos-local-ai/
 ├── assets/app.ico            # アイコン
 ├── vendor/                   # nssm.exe・サードパーティライセンス
 └── docs/user-guide.md        # ユーザーマニュアル
+```
+
+## 低スペック機向けの性能チューニング（自動適用）
+
+インストール時に以下を自動設定し、メモリ8GB〜16GBのPCでも快適に動作させます（専用GPUがある場合はOllamaが自動で利用）。
+
+| 設定 | 効果 |
+|------|------|
+| KVキャッシュ量子化（q8_0） | コンテキストメモリを約半分に削減（品質への影響はほぼなし） |
+| Flash Attention 有効化 | 長文コンテキストの高速化 |
+| 常駐モデル数を1に制限 | LLM/埋め込みモデルの同時常駐によるメモリ逼迫を防止 |
+| モデルを10分間キャッシュ | 連続利用時の再読み込み待ちを解消 |
+
+※ AMD系の統合GPU（iGPU）は実測でCPUと同じ速度のため、既定では無効のままにしています（有効化すると初回読み込みが遅くなるだけです）。
+
+### 「応答なし」問題の対策（ツール無効化）
+
+Open WebUI はモデルに「ツール」（例: 回答をノートに書く write_note など約34個）を提供します。**モデルがツール呼び出しを選ぶと、チャットにテキスト回答が残らず「応答なし」のように見える**ことがあります（実機検証で確認）。本ツールでは:
+
+- インストール時に「Shineos Chat」という**別名カスタムモデル**を作成し、**すべてのツールを無効化**（ツールが無ければモデルは必ずテキストで回答します）
+- qwen3系の思考モードも `think:false` で無効化（応答なし防止）
+- モデル設定は `configure_model.ps1` で自動適用。やり直したい場合は管理者PowerShellで:
+
+```powershell
+& "C:\Program Files\ShineosLocalAI\configure_model.ps1" -Model "qwen2.5:3b"
 ```
 
 ## ビルド
@@ -75,3 +105,45 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 
 - 不具合・導入支援・カスタマイズのご相談: https://shineos.com/contact/
 - 本ツールは **無料** です。製造業向けオフラインAI（図面・マニュアル検索）のご相談もお気軽にどうぞ
+
+## ファイル生成（PDF / PPTX / Word）ツールサーバー
+
+チャットから PDF・PowerPoint・Word ファイルを生成できるツールサーバーを同梱しています。
+
+- **軽量サーバー**（`tools/filegen_server.py`）: PDF（reportlab・日本語対応）・PPTX（python-pptx）生成
+- **MCPO-File-Generation-Tool**（`tools/mcpo/`・MIT）: PDF・PPTX・**Word（DOCX）**・XLSX・CSV 生成・MCP 対応（[GitHub](https://github.com/GlisseManTV/MCPO-File-Generation-Tool)・日本語フォント対応パッチ適用済み）
+
+### インストール時（自動適用）
+- 依存ライブラリ（reportlab・python-pptx・python-docx・openpyxl・mcp 等）を自動インストール
+- サーバーを Windows サービスとして自動登録（`ShineosFileGen`・`ShineosMcpoFiles`・`ShineosMcpoMcp`）
+- 生成ファイルは `{app}\data\mcpo_output\` に保存
+
+### チャットでファイル生成を使う
+1. Open WebUI の管理画面 → 設定 → ツールサーバーで `filegen` / `mcpo` が登録済みであることを確認
+2. ワークスペース → モデル → Shineos Chat 編集画面の「Tools」でツールを有効化
+3. チャットで「PDF（または Word / PowerPoint）を作成して…」と依頼
+
+### 生成ファイルの保存先
+- 軽量サーバー: `C:\Users\zheng\shineos-filegen-out\`（環境変数 `FILEGEN_OUT` で変更可）
+- MCPO: `{app}\data\mcpo_output\`
+
+## 管理者向けの推奨設定（要・管理者権限）
+
+以下の設定は管理者権限が必要なため、インストーラ再実行で自動適用されます。個別に適用する場合は管理者PowerShellで:
+
+```powershell
+# 1. Ollama の性能チューニング（KV量子化・Flash Attention・常駐制限）
+& "C:\Program Files\ShineosLocalAI\setup_ollama.ps1" -AppDir "C:\Program Files\ShineosLocalAI" -TmpDir $env:TEMP
+
+# 2. RAG設定の反映（bge-m3・同期エンベッディング・コンテキスト圧縮）
+#    ※ 再インストール時に自動適用されます
+```
+
+## UI設定（言語・通知）
+
+- **言語**: インストール時に日本語（ja-JP）を自動設定。手動で切り替える場合は Open WebUI の「設定 → 一般 → 言語」で選択できます
+- **バージョンアップ通知・「What's New」通知**: 無効化（`ENABLE_VERSION_UPDATE_CHECK=False`）— アップデート確認と新機能通知のトーストが表示されません
+- **アプリを閉じたとき**: Open WebUI サービス停止 + Ollama のロード済みモデルを自動アンロード（メモリ解放）
+- **デスクトップショートカット**: インストール時に自動作成（「Shineos Local AI」）
+
+※ 上記は再インストール時に自動適用されます

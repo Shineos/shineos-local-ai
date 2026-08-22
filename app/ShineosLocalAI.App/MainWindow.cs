@@ -1,7 +1,9 @@
-// ShineosLocalAI.App - Open WebUI を WebView2 でラップするデスクトップアプリ
+﻿// ShineosLocalAI.App - Open WebUI を WebView2 でラップするデスクトップアプリ
 // - 起動: サービス起動確認 → /health 待ち → http://localhost:8080 を表示
 // - 終了: サービスを停止（閉じたら localhost:8080 も閉じる）
-// - ロード中は中央にスピナー付きメッセージを表示
+// - ローディング中は中央にスピナー付きメッセージを表示
+//   ※ WebView2 は HWND ベースのため WPF 要素を上に重ねられない。
+//     ローディング中は WebView2 を非表示にし、完了時に表示を切り替える。
 // - ポート8080が他アプリに占有されている場合は誤表示せず中央にエラー表示
 //   （サービスの子プロセス（python）が8080を持つ場合は「自サービス」と判定）
 // - ビルド: build.ps1（.NET Framework 4.x csc 使用・SDK 不要）
@@ -31,7 +33,7 @@ namespace ShineosLocalAI
         readonly int Port;
 
         readonly WebView2 webView = new WebView2();
-        readonly Grid overlay;
+        readonly Grid loadingPanel;
         readonly System.Windows.Shapes.Path spinner;
         readonly TextBlock overlayTitle;
         readonly TextBlock overlayMessage;
@@ -54,8 +56,10 @@ namespace ShineosLocalAI
             }
             catch { }
             Port = port;
-            AppUrl = "http://localhost:" + Port;
-            HealthUrl = AppUrl + "/health";
+            // ?lang=ja-JP で Open WebUI の UI を日本語表示にする
+            // （ブラウザ言語の自動検出を上書きして確実に日本語を表示する）
+            AppUrl = "http://localhost:" + Port + "/?lang=ja-JP";
+            HealthUrl = "http://localhost:" + Port + "/health";
 
             Title = "Shineos Local AI";
             Width = 1200;
@@ -75,13 +79,12 @@ namespace ShineosLocalAI
 
             var root = new Grid();
 
-            // WebView2
-            root.Children.Add(webView);
-
-            // 中央オーバーレイ（ローディング・エラー表示）
-            overlay = new Grid
+            // ローディングパネル（WebView2 は HWND ベースのため WPF 要素を
+            // 上に重ねられない。ローディング中は WebView2 を非表示にして
+            // 表示を切り替える方式にする）
+            loadingPanel = new Grid
             {
-                Background = new SolidColorBrush(Color.FromArgb(250, 255, 255, 255)),
+                Background = Brushes.White,
                 Visibility = Visibility.Visible
             };
             var center = new StackPanel
@@ -90,7 +93,7 @@ namespace ShineosLocalAI
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            // Material Design 風のリングスピナー（270° の円弧を滑らかに回転）
+            // Material Design 風のリングスピナー（270° の円弧を中心で自転）
             spinner = new System.Windows.Shapes.Path
             {
                 Width = 56,
@@ -105,6 +108,8 @@ namespace ShineosLocalAI
             };
             var spin = new RotateTransform(0);
             spinner.RenderTransform = spin;
+            // 回転中心をリング中心（要素中央）に指定し、自転させる
+            spinner.RenderTransformOrigin = new Point(0.5, 0.5);
             spin.BeginAnimation(RotateTransform.AngleProperty,
                 new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(1000)) { RepeatBehavior = RepeatBehavior.Forever });
 
@@ -143,9 +148,13 @@ namespace ShineosLocalAI
             center.Children.Add(overlayTitle);
             center.Children.Add(overlayMessage);
             center.Children.Add(retryButton);
-            overlay.Children.Add(center);
-            root.Children.Add(overlay);
+            loadingPanel.Children.Add(center);
 
+            // WebView2 は初期状態で非表示（ローディング完了後に表示）
+            webView.Visibility = Visibility.Collapsed;
+
+            root.Children.Add(loadingPanel);
+            root.Children.Add(webView);
             Content = root;
 
             Loaded += async (s, e) => { try { await Startup(); } catch (Exception ex) { ShowError("起動に失敗しました: " + ex.Message, true); } };
@@ -159,8 +168,8 @@ namespace ShineosLocalAI
             retryButton.Visibility = Visibility.Collapsed;
             overlayMessage.Text = msg;
             overlayMessage.Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
-            overlay.Visibility = Visibility.Visible;
-            overlay.Opacity = 1;
+            loadingPanel.Visibility = Visibility.Visible;
+            webView.Visibility = Visibility.Collapsed;
         }
 
         void ShowError(string msg, bool showRetry)
@@ -169,15 +178,14 @@ namespace ShineosLocalAI
             retryButton.Visibility = showRetry ? Visibility.Visible : Visibility.Collapsed;
             overlayMessage.Text = msg;
             overlayMessage.Foreground = new SolidColorBrush(Colors.DarkRed);
-            overlay.Visibility = Visibility.Visible;
-            overlay.Opacity = 1;
+            loadingPanel.Visibility = Visibility.Visible;
+            webView.Visibility = Visibility.Collapsed;
         }
 
-        void HideOverlay()
+        void HideLoading()
         {
-            var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(400));
-            fade.Completed += (s, e) => overlay.Visibility = Visibility.Collapsed;
-            overlay.BeginAnimation(OpacityProperty, fade);
+            webView.Visibility = Visibility.Visible;
+            loadingPanel.Visibility = Visibility.Collapsed;
         }
 
         void Log(string msg)
@@ -379,7 +387,7 @@ namespace ShineosLocalAI
                 return;
             }
 
-            HideOverlay();
+            HideLoading();
             await webView.EnsureCoreWebView2Async(null);
             webView.Source = new Uri(AppUrl);
         }
@@ -389,6 +397,37 @@ namespace ShineosLocalAI
             if (closing) return;
             closing = true;
             try { RunSc("stop " + ServiceName); } catch { }
+            // アプリ終了時に Ollama のロード済みモデルをアンロードしてメモリを解放する
+            // （Open WebUI は停止するが Ollama は常駐のため、モデルだけ明示的に解放する）
+            try
+            {
+                var listReq = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:11434/api/ps");
+                listReq.Timeout = 3000;
+                using (var listResp = (HttpWebResponse)listReq.GetResponse())
+                using (var reader = new StreamReader(listResp.GetResponseStream()))
+                {
+                    string json = reader.ReadToEnd();
+                    foreach (System.Text.RegularExpressions.Match m in
+                        System.Text.RegularExpressions.Regex.Matches(json, "\"name\"\\s*:\\s*\"([^\"]+)\""))
+                    {
+                        try
+                        {
+                            string model = m.Groups[1].Value;
+                            string body = "{\"model\":\"" + model + "\",\"keep_alive\":0}";
+                            var unload = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:11434/api/generate");
+                            unload.Method = "POST";
+                            unload.ContentType = "application/json";
+                            unload.Timeout = 5000;
+                            byte[] data = System.Text.Encoding.UTF8.GetBytes(body);
+                            unload.ContentLength = data.Length;
+                            using (var stream = unload.GetRequestStream()) stream.Write(data, 0, data.Length);
+                            using (var resp = (HttpWebResponse)unload.GetResponse()) { }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
         }
     }
 

@@ -57,6 +57,16 @@ jobs:
           Write-Output "ISCC: $iscc"
           Write-Output "ISCC_PATH=$iscc" >> $env:GITHUB_ENV
 
+      # WebView2 ラッパーアプリ（dist\ShineosLocalAI.App）は .gitignore で除外されているため、
+      # CI のクリーンな checkout には存在しない。installer.iss が参照するため先にビルドする
+      # （過去の失敗: v1.0.28 で "No files found matching ...dist\ShineosLocalAI.App\*" が発生）
+      - name: Build WebView2 wrapper app
+        shell: pwsh
+        run: |
+          & .\app\ShineosLocalAI.App\build.ps1
+          if ($LASTEXITCODE -ne 0) { throw "WebView2 app build failed (exit $LASTEXITCODE)" }
+          Get-ChildItem dist\ShineosLocalAI.App | Select-Object Name, Length
+
       - name: Build installer
         shell: pwsh
         run: |

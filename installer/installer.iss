@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.28"
+#define MyAppVersion "1.0.31"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -55,12 +55,20 @@ Source: "..\scripts\setup_python.ps1";     DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\setup_ollama.ps1";     DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\setup_openwebui.ps1";  DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\register_service.ps1"; DestDir: "{tmp}"; Flags: dontcopy
+Source: "..\scripts\configure_model.ps1";   DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\wait_ready.ps1";       DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\vendor\nssm.exe";              DestDir: "{tmp}"; Flags: dontcopy
 
 ; --- インストール先へ配置するファイル ----------------------------------------
 Source: "..\vendor\nssm.exe";              DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "..\tools\filegen_server.py";     DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "..\tools\mcpo\tools\file_export_server.py"; DestDir: "{app}\tools\mcpo\tools"; Flags: ignoreversion
+Source: "..\tools\mcpo\tools\file_export_mcp.py";    DestDir: "{app}\tools\mcpo\tools"; Flags: ignoreversion
+Source: "..\tools\mcpo\tools\__init__.py";          DestDir: "{app}\tools\mcpo\tools"; Flags: ignoreversion
+Source: "..\tools\mcpo\templates\*";      DestDir: "{app}\tools\mcpo\templates"; Flags: ignoreversion recursesubdirs
+Source: "..\tools\mcpo\requirements.txt"; DestDir: "{app}\tools\mcpo"; Flags: ignoreversion
 Source: "..\scripts\start_openwebui.bat";  DestDir: "{app}";       Flags: ignoreversion
+Source: "..\scripts\configure_model.ps1";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\assets\app.ico";               DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\vendor\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}";     Flags: ignoreversion
 ; WebView2 ラッパーアプリ（URL入力不要・閉じたらサービス停止）
@@ -78,6 +86,7 @@ Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\tools"
 Type: filesandordirs; Name: "{app}\app"
 Type: files; Name: "{app}\install.log"
+Type: files; Name: "{app}\configure_model.ps1"
 Type: files; Name: "{userdesktop}\ShineosLocalAI-はじめに.txt"
 
 [Code]
@@ -104,6 +113,7 @@ begin
   ExtractTemporaryFile('setup_ollama.ps1');
   ExtractTemporaryFile('setup_openwebui.ps1');
   ExtractTemporaryFile('register_service.ps1');
+  ExtractTemporaryFile('configure_model.ps1');
   ExtractTemporaryFile('wait_ready.ps1');
   ExtractTemporaryFile('nssm.exe');
 end;
@@ -164,14 +174,19 @@ begin
   ModelPage := CreateInputOptionPage(wpSelectDir,
     'AIモデルの選択',
     'インストールするAIモデルを選択してください',
-    '検出メモリ: ' + IntToStr(RamGB) + ' GB。使用ポート: ' + IntToStr(SelectedPort) + '（8080 が空いていれば 8080）。日本語業務向けモデルです。' + #13#10 +
-    '業務利用の標準は「7b（推奨）」、3bは標準・高速、1.5bは補助（軽量・速度優先）向けです。' + #13#10 +
+    '検出メモリ: ' + IntToStr(RamGB) + ' GB。使用ポート: ' + IntToStr(SelectedPort) + '（8080 が空いていれば 8080）。' + #13#10 +
     '動作が重い場合は下の「軽量」を選択してください。',
     True, False);
-  ModelPage.Add('qwen2.5:7b（推奨）　業務向け・日本語品質が最も高い・約4.7GB・応答10〜15秒');
-  ModelPage.Add('qwen2.5:3b（標準）　バランス・高速・約1.9GB・応答1〜3秒');
-  ModelPage.Add('qwen2.5:1.5b（軽量）　補助向け・8GB機に最適・約1GB・応答1秒未満');
-  ModelPage.SelectedValueIndex := 0;
+  ModelPage.Add('qwen2.5:3b（推奨）　高速・確実・約1.9GB・応答約1秒（8GB機でも快適）');
+  ModelPage.Add('qwen2.5:7b（高品質）　16GB以上のメモリ推奨・約4.7GB・応答数秒');
+  ModelPage.Add('qwen2.5:1.5b（軽量）　8GB機に最適・最速・約1GB・応答1秒未満');
+  { 検出メモリに応じて既定を自動選択（8GB未満は軽量、16GB以上は高品質、それ以外は推奨） }
+  if RamGB < 8 then
+    ModelPage.SelectedValueIndex := 2
+  else if RamGB >= 16 then
+    ModelPage.SelectedValueIndex := 1
+  else
+    ModelPage.SelectedValueIndex := 0;
 end;
 
 { ---------- 長い処理（キャンセル可能な進捗ページ） ---------- }
@@ -184,7 +199,7 @@ begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
     'Shineos Local AI のセットアップを実行しています。' + #13#10 +
-    '完了まで約20〜60分かかります（Ollama本体1.5GB＋AIモデル1.9GBなど合計約4GBのダウンロードを含みます）。' + #13#10 +
+    '完了まで約20〜60分かかります（Ollama本体1.5GB＋AIモデル2.5GB＋Python・Open WebUI等、合計約7GBのダウンロードを含みます）。' + #13#10 +
     'インストール中はウィンドウを閉じないでください。');
   try
     ProgressPage.Show;
@@ -238,7 +253,7 @@ begin
   if CurPageID = wpReady then
   begin
     AppDir := ExpandConstant('{app}');
-    if not IsAdminLoggedOn then
+    if not IsAdmin then
     begin
       MsgBox('インストールには管理者権限が必要です。' + #13#10 +
              'exeを右クリック →「管理者として実行」を選択してやり直してください。', mbError, MB_OK);
@@ -246,11 +261,11 @@ begin
       Exit;
     end;
     if ModelPage.SelectedValueIndex = 1 then
-      SelectedModel := 'qwen2.5:3b'
+      SelectedModel := 'qwen2.5:7b'
     else if ModelPage.SelectedValueIndex = 2 then
       SelectedModel := 'qwen2.5:1.5b'
     else
-      SelectedModel := 'qwen2.5:7b';
+      SelectedModel := 'qwen2.5:3b';
     Result := RunLongSteps(AppDir);
   end;
 end;
@@ -310,6 +325,13 @@ begin
           MsgBox('Open WebUI の起動確認がタイムアウトしました。' + #13#10 +
                  'ブラウザで http://localhost:' + IntToStr(SelectedPort) + ' を開いて起動を確認してください。' + #13#10 +
                  'ログ: ' + AppDir + '\logs\openwebui.err.log', mbInformation, MB_OK);
+
+        { AIモデル設定（qwen3系の思考モード無効化とコンテキスト長の最適化） }
+        ProgressPage.SetText('AIモデルを設定しています...', '');
+        if not (RunPowerShell('configure_model.ps1', '-BaseUrl "http://localhost:' + IntToStr(SelectedPort) + '" -Model "' + SelectedModel + '" -LogFile "' + AppDir + '\logs\configure_model.log"', RC) and (RC = 0)) then
+          MsgBox('モデル設定に失敗しました。' + #13#10 +
+                 'qwen3系モデルの場合、思考モードが無効化されないため応答が遅くなることがあります。' + #13#10 +
+                 'ログ: ' + AppDir + '\logs\openwebui.err.log', mbInformation, MB_OK);
       end;
 
       { 使用ポートをラッパーアプリ用に保存 }
@@ -343,8 +365,8 @@ begin
   UninstallRemoveOllama := False;
   if not UninstallSilent then
     UninstallRemoveOllama := MsgBox(
-      'Ollama（LLM実行エンジン）とダウンロード済みAIモデル（約3.2GB）も削除しますか？' + #13#10 + #13#10 +
-      '「はい」: Ollama本体・AIモデル・関連サービスをすべて削除します。' + #13#10 +
+      'Ollama（LLM実行エンジン）とダウンロード済みAIモデル（選択モデルにより約2〜5GB）も削除しますか？' + #13#10 + #13#10 +
+      '「はい」: Ollama本体・AIモデル・関連サービス・性能設定をすべて削除します。' + #13#10 +
       '　　　　 再インストール時はOllamaとモデルの再ダウンロード（約2時間）が必要です。' + #13#10 +
       '「いいえ」: Shineos Local AI のファイルとサービスだけを削除し、Ollama は残します。',
       mbConfirmation, MB_YESNO) = IDYES;
@@ -377,6 +399,15 @@ begin
   DelTree(ExpandConstant('{userprofile}\.ollama'), True, True, True);
   DelTree(ExpandConstant('{localappdata}\Programs\Ollama'), True, True, True);
   DelTree(ExpandConstant('{appdata}\Ollama'), True, True, True);
+  { サービス（SYSTEMアカウント）がモデルを保存した場合は systemprofile 側も削除 }
+  DelTree(ExpandConstant('{sys}\..\systemprofile\.ollama'), True, True, True);
+
+  { インストーラが設定した性能チューニング用環境変数を削除 }
+  RegDeleteValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'OLLAMA_MAX_LOADED_MODELS');
+  RegDeleteValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'OLLAMA_KV_CACHE_TYPE');
+  RegDeleteValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'OLLAMA_FLASH_ATTENTION');
+  RegDeleteValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'OLLAMA_KEEP_ALIVE');
+  RegDeleteValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'OLLAMA_NUM_PARALLEL');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

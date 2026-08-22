@@ -96,7 +96,9 @@ try {
         $url = "https://www.nuget.org/api/v2/package/python/$Version"
         Log "downloading $url"
         Progress 'downloading python 3.12.10 (portable)...'
-        & curl.exe -L --fail --retry 3 --connect-timeout 30 -o $nupkg $url
+        # -sS: 進捗メーターを抑制（PowerShell 5.1 は stderr 出力をエラー扱いし、
+        # ユーザーに「エラー」と誤解させるため。エラー時のみ表示する）
+        & curl.exe -sS -L --fail --retry 3 --connect-timeout 30 -o $nupkg $url
         if ($LASTEXITCODE -ne 0) { throw "python download failed (curl exit $LASTEXITCODE)" }
         $size = (Get-Item $nupkg).Length
         Log "downloaded: $([math]::Round($size / 1MB, 1)) MB"
