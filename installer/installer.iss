@@ -9,7 +9,7 @@
 ; ============================================================================
 
 #define MyAppName "社内知恵袋"
-#define MyAppVersion "1.0.34"
+#define MyAppVersion "1.0.35"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
@@ -72,8 +72,6 @@ Source: "..\tools\mcpo\requirements.txt"; DestDir: "{app}\tools\mcpo"; Flags: ig
 Source: "..\scripts\start_openwebui.bat";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\scripts\configure_model.ps1";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\scripts\setup_knowledge.ps1";  DestDir: "{app}";       Flags: ignoreversion
-; ナレッジ再登録ツール（ダブルクリックだけで再登録・コマンド操作不要）
-Source: "..\scripts\ナレッジ再登録.bat";   DestDir: "{app}";       Flags: ignoreversion
 Source: "..\assets\app.ico";               DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\vendor\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}";     Flags: ignoreversion
 ; WebView2 ラッパーアプリ（URL入力不要・閉じたらサービス停止）
@@ -96,18 +94,19 @@ Type: filesandordirs; Name: "{app}\knowledge"
 Type: files; Name: "{app}\install.log"
 Type: files; Name: "{app}\configure_model.ps1"
 Type: files; Name: "{app}\setup_knowledge.ps1"
-Type: files; Name: "{app}\ナレッジ再登録.bat"
 Type: files; Name: "{userdesktop}\ShineosQA-はじめに.txt"
 
 [Code]
 var
   ProgressPage: TOutputProgressWizardPage;
   ModelPage: TInputOptionWizardPage;
+  KnowledgePage: TInputDirWizardPage;
   RamGB: Integer;
   PortFree: Boolean;
   OsOk: Boolean;
   SelectedModel: String;
   SelectedPort: Integer;
+  SelectedKnowledgeDir: String;
   UninstallRemoveOllama: Boolean;
 
 const
@@ -198,6 +197,16 @@ begin
     ModelPage.SelectedValueIndex := 1
   else
     ModelPage.SelectedValueIndex := 0;
+
+  { ナレッジ（社内文書）フォルダの指定（任意） }
+  KnowledgePage := CreateInputDirPage(ModelPage.ID,
+    '社内文書（ナレッジ）フォルダ',
+    'PDF・Markdown を置いたフォルダを選択してください（任意）',
+    '選択したフォルダの文書がインストール時に自動登録されます。' + #13#10 +
+    '指定しない場合は、インストーラ同梱のサンプル（QA_list.md）のみ登録されます。' + #13#10 +
+    'インストール後は、アプリ画面からも資料を追加できます。',
+    False, '');
+  KnowledgePage.Add('');
 end;
 
 { ---------- 長い処理（キャンセル可能な進捗ページ） ---------- }
@@ -261,6 +270,9 @@ var
   AppDir: String;
 begin
   Result := True;
+  { ナレッジフォルダ指定ページの入力を保持（未指定なら空のまま = 同梱サンプルのみ） }
+  if CurPageID = KnowledgePage.ID then
+    SelectedKnowledgeDir := Trim(KnowledgePage.Values[0]);
   if CurPageID = wpReady then
   begin
     AppDir := ExpandConstant('{app}');
@@ -294,7 +306,7 @@ begin
        '・社内Q&A（ナレッジ検索）: ' + AppDir + '\knowledge フォルダの社内文書（PDF・Markdown）を自動登録済み。' + #13#10 +
        '　質問すると、根拠となった文書名・該当箇所つきで回答します' + #13#10 +
        '・用途別プリセット: チャットのモデル選択で「経費精算ガイド」「ITヘルプデスク」に切り替えられます' + #13#10 +
-       '・ナレッジの追加: knowledge フォルダに文書を置き、「ナレッジ再登録.bat」をダブルクリック' + #13#10 +
+       '・ナレッジの追加: アプリ画面（Open WebUI）のナレッジメニューから、いつでも資料（PDF・Markdown）を追加できます' + #13#10 +
        '　（ファイル名や文書の先頭に【経費精算】などのタグを付けると検索精度が向上します）' + #13#10 +
        '・ナレッジに無いことは「該当する記載がありません」と回答します（ハルシネーション抑制）' + #13#10 +
        '・Web検索（オプション）: チャットのWeb検索ボタンをONにすると利用できます（DuckDuckGo・APIキー不要）' + #13#10 +
@@ -348,11 +360,20 @@ begin
                  'ログ: ' + AppDir + '\logs\openwebui.err.log', mbInformation, MB_OK);
 
         { ナレッジ自動登録（knowledgeフォルダの社内文書をベクトル化してRAG検索可能にする） }
+        { インストール画面で指定されたフォルダの文書をインストール先の knowledge フォルダへコピー }
+        if SelectedKnowledgeDir <> '' then
+        begin
+          ProgressPage.SetText('社内文書をコピーしています...', '');
+          Exec('robocopy.exe', '"' + SelectedKnowledgeDir + '" "' + AppDir + '\knowledge" /E /NFL /NDL /NJH /NJS /NC /NS', '', SW_HIDE, ewWaitUntilTerminated, RC);
+          { robocopy は 0〜7 が成功（8以上はエラー） }
+          if RC >= 8 then
+            MsgBox('社内文書フォルダのコピーに失敗しました（コード: ' + IntToStr(RC) + '）。' + #13#10 +
+                   'インストール後、アプリ画面から資料を追加してください。', mbInformation, MB_OK);
+        end;
         ProgressPage.SetText('ナレッジ（社内文書）を登録しています...', '');
         if not (RunPowerShell('setup_knowledge.ps1', '-BaseUrl "http://localhost:' + IntToStr(SelectedPort) + '" -KnowledgeDir "' + AppDir + '\knowledge" -LogFile "' + AppDir + '\logs\setup_knowledge.log"', RC) and (RC = 0)) then
           MsgBox('ナレッジ登録に失敗しました。' + #13#10 +
-                 'インストール後に ' + AppDir + '\knowledge フォルダに文書を追加し、' + #13#10 +
-                 '「' + AppDir + '\ナレッジ再登録.bat」をダブルクリックしてください。' + #13#10 +
+                 'インストール後、アプリ画面（Open WebUI）から資料を追加できます。' + #13#10 +
                  'ログ: ' + AppDir + '\logs\setup_knowledge.log', mbInformation, MB_OK);
       end;
 
