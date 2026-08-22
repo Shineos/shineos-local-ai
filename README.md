@@ -1,18 +1,21 @@
-# Shineos Local AI
+# 社内知恵袋
 
-**ダブルクリック一発・初期設定なしで使える、Windows向けローカルAI（チャット + RAG + Web検索）無料インストーラ**
+**社内規定・業務マニュアルをナレッジ化し、社内Q&Aをパソコン内だけで安全に実現する Windows アプリ**
 
-[Shineos Inc.](https://shineos.com) が公開する無料ツールです。Ollama + Open WebUI によるローカルAI環境を、技術者でない方でもインストールした瞬間から使えるようにパッケージ化しました。
+[Shineos Inc.](https://shineos.com) が提供する社内Q&Aツールです。Ollama + Open WebUI によるローカルAI環境を、技術者でない方でもインストールした瞬間から使えるようにパッケージ化しました。
 
 ## できること
 
 | 機能 | 内容 |
 |------|------|
-| ローカルチャット | インストール後すぐ利用。ログイン・アカウント登録は不要 |
-| RAG（文書質問） | PDF等の文書をアップロードして、その内容を日本語で質問・引用付き回答 |
-| Web検索（オプション） | チャットのWeb検索ボタンONで最新情報を参照（DuckDuckGo・APIキー不要） |
-| 完全オフライン運用 | Web検索をOFFのままなら、一切インターネットに接続しない（機密資料の利用に最適） |
+| 社内Q&A（RAG） | ナレッジに登録した社内規定・業務マニュアルから、根拠（文書名・該当箇所）付きで回答 |
+| ナレッジ自動登録 | `{app}\knowledge` フォルダに PDF・Markdown を置くだけで、インストール時に自動登録 |
+| ハイブリッド検索 | BM25（キーワード一致）+ ベクトル検索（意味一致）の併用で、型番・規程番号・固有名詞を正確にヒット |
+| 用途別プリセット | 「経費精算ガイド」「ITヘルプデスク」など用途別ボットを選択するだけ |
+| ハルシネーション抑制 | ナレッジに回答が無い場合は推測せず「該当する記載がありません」と回答（ガードレール付き） |
+| 完全オフライン運用 | 社内資料を外部に送信しない（機密資料の利用に最適） |
 | 自動起動 | PC再起動後も Windowsサービスとして自動起動 |
+| Web検索（オプション） | チャットのWeb検索ボタンONで最新情報を参照（DuckDuckGo・APIキー不要） |
 
 ## 動作環境
 
@@ -23,22 +26,22 @@
 
 ## ダウンロード
 
-[![Latest Release](https://img.shields.io/github/v/release/Shineos/shineos-local-ai?sort=semver&label=Latest%20Release)](https://github.com/Shineos/shineos-local-ai/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/Shineos/shineos-qa-assistant?sort=semver&label=Latest%20Release)](https://github.com/Shineos/shineos-qa-assistant/releases/latest)
 
-[Releases](https://github.com/Shineos/shineos-local-ai/releases) ページから最新の `ShineosLocalAI-Setup-<version>.exe` をダウンロードし、**ダブルクリックするだけでインストール**できます。
+[Releases](https://github.com/Shineos/shineos-qa-assistant/releases) ページから最新の `ShineosQA-Setup-<version>.exe` をダウンロードし、**ダブルクリックするだけでインストール**できます。
 
 ※ 現在はテスト証明書（自己署名）での署名のため、SmartScreenが「認識されないアプリ」と表示することがあります。その場合は「**詳細情報**」→「**実行**」、またはファイルを右クリック → プロパティ → 全般タブ →「**ブロックの解除**」にチェックを入れてから実行してください。
 
 ## 使い方
 
-1. `ShineosLocalAI-Setup-<version>.exe` をダブルクリック（管理者権限を要求されます）
+1. `ShineosQA-Setup-<version>.exe` をダブルクリック（管理者権限を要求されます）
 2. AIモデルを選択
    - **qwen2.5:3b（推奨・高速）**: 約1.9GB・8GBメモリ機でも快適（応答約1秒）
    - **qwen2.5:7b（高品質）**: 約4.7GB・16GB以上のメモリ推奨
    - **qwen2.5:1.5b（軽量）**: 約1GB・8GB機に最適・最速
-3. インストール完了後、デスクトップの「Shineos Local AI」をダブルクリックするとアプリ画面が開きます（URL入力不要・閉じるとサービスも停止）
+3. インストール完了後、デスクトップの「社内知恵袋」をダブルクリックするとアプリ画面が開きます（URL入力不要・閉じるとサービスも停止）
 
-※ チャット画面では「Shineos Chat」というモデルが自動選択されます（ツール無効化・思考モード無効化済みの最適化モデル。インストール時に選択したモデルがベース）。
+※ チャット画面では「社内知恵袋」というモデルが自動選択されます（ツール無効化・思考モード無効化済みの最適化モデル。インストール時に選択したモデルがベース）。
 
 詳細は [docs/user-guide.md](docs/user-guide.md) を参照してください。
 
@@ -50,7 +53,7 @@
 ## 構成
 
 ```
-shineos-local-ai/
+shineos-qa-assistant/
 ├── installer/installer.iss   # Inno Setup 6.7.3 インストーラスクリプト
 ├── scripts/                  # セットアップ用 PowerShell / バッチ
 ├── assets/app.ico            # アイコン
@@ -75,12 +78,12 @@ shineos-local-ai/
 
 Open WebUI はモデルに「ツール」（例: 回答をノートに書く write_note など約34個）を提供します。**モデルがツール呼び出しを選ぶと、チャットにテキスト回答が残らず「応答なし」のように見える**ことがあります（実機検証で確認）。本ツールでは:
 
-- インストール時に「Shineos Chat」という**別名カスタムモデル**を作成し、**すべてのツールを無効化**（ツールが無ければモデルは必ずテキストで回答します）
+- インストール時に「社内知恵袋」という**別名カスタムモデル**を作成し、**すべてのツールを無効化**（ツールが無ければモデルは必ずテキストで回答します）
 - qwen3系の思考モードも `think:false` で無効化（応答なし防止）
 - モデル設定は `configure_model.ps1` で自動適用。やり直したい場合は管理者PowerShellで:
 
 ```powershell
-& "C:\Program Files\ShineosLocalAI\configure_model.ps1" -Model "qwen2.5:3b"
+& "C:\Program Files\ShineosQA\configure_model.ps1" -Model "qwen2.5:3b"
 ```
 
 ## ビルド
@@ -91,7 +94,7 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\installer.iss
 ```
 
-出力: `dist\ShineosLocalAI-Setup-<version>.exe`
+出力: `dist\ShineosQA-Setup-<version>.exe`
 
 ※ 通常は GitHub Actions が自動ビルドして GitHub Releases に公開します（`v*` タグの push で発火）。
 
@@ -120,11 +123,11 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 
 ### チャットでファイル生成を使う
 1. Open WebUI の管理画面 → 設定 → ツールサーバーで `filegen` / `mcpo` が登録済みであることを確認
-2. ワークスペース → モデル → Shineos Chat 編集画面の「Tools」でツールを有効化
+2. ワークスペース → モデル → 社内知恵袋 編集画面の「Tools」でツールを有効化
 3. チャットで「PDF（または Word / PowerPoint）を作成して…」と依頼
 
 ### 生成ファイルの保存先
-- 軽量サーバー: `C:\Users\zheng\shineos-filegen-out\`（環境変数 `FILEGEN_OUT` で変更可）
+- 軽量サーバー: `C:\Users\zheng\shineos-qa-out\`（環境変数 `FILEGEN_OUT` で変更可）
 - MCPO: `{app}\data\mcpo_output\`
 
 ## 管理者向けの推奨設定（要・管理者権限）
@@ -133,7 +136,7 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 
 ```powershell
 # 1. Ollama の性能チューニング（KV量子化・Flash Attention・常駐制限）
-& "C:\Program Files\ShineosLocalAI\setup_ollama.ps1" -AppDir "C:\Program Files\ShineosLocalAI" -TmpDir $env:TEMP
+& "C:\Program Files\ShineosQA\setup_ollama.ps1" -AppDir "C:\Program Files\ShineosQA" -TmpDir $env:TEMP
 
 # 2. RAG設定の反映（bge-m3・同期エンベッディング・コンテキスト圧縮）
 #    ※ 再インストール時に自動適用されます
@@ -144,6 +147,6 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 - **言語**: インストール時に日本語（ja-JP）を自動設定。手動で切り替える場合は Open WebUI の「設定 → 一般 → 言語」で選択できます
 - **バージョンアップ通知・「What's New」通知**: 無効化（`ENABLE_VERSION_UPDATE_CHECK=False`）— アップデート確認と新機能通知のトーストが表示されません
 - **アプリを閉じたとき**: Open WebUI サービス停止 + Ollama のロード済みモデルを自動アンロード（メモリ解放）
-- **デスクトップショートカット**: インストール時に自動作成（「Shineos Local AI」）
+- **デスクトップショートカット**: インストール時に自動作成（「社内知恵袋」）
 
 ※ 上記は再インストール時に自動適用されます

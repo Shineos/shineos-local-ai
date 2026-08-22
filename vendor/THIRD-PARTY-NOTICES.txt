@@ -1,4 +1,4 @@
-Shineos Local AI - Third Party Notices
+社内知恵袋 - Third Party Notices
 ========================================
 
 本製品（インストーラ）は、以下のオープンソースコンポーネントを同梱・自動導入します。
@@ -42,6 +42,6 @@ Shineos Local AI - Third Party Notices
 8. Microsoft.Web.WebView2 SDK (1.0.4129)
    - ライセンス: Microsoft Software License Terms（WebView2 SDK）
    - 出典: https://www.nuget.org/packages/Microsoft.Web.WebView2
-   - 用途: デスクトップアプリ「Shineos Local AI」の画面表示（同梱）
+   - 用途: デスクトップアプリ「社内知恵袋」の画面表示（同梱）
 
 本製品のコード（Inno Setupスクリプト・PowerShell・バッチ・C#）は MIT License で提供します。

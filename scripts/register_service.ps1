@@ -1,4 +1,4 @@
-﻿# register_service.ps1 - NSSM で Windowsサービス「ShineosLocalAI」を登録・起動
+﻿# register_service.ps1 - NSSM で Windowsサービス「ShineosQA」を登録・起動
 # - システム環境変数は変更しない（NSSM の AppEnvironmentExtra に注入）
 # - 再インストール時は既存サービスを削除し、data ディレクトリを初期化する
 #   （WEBUI_AUTH=False は「ユーザー0の新規DB」でのみ有効なため）
@@ -21,7 +21,7 @@ if (-not (Test-Path $nssm)) { throw "nssm.exe not found: $nssm" }
 $owui = Join-Path $AppDir 'venv\Scripts\open-webui.exe'
 if (-not (Test-Path $owui)) { throw "open-webui.exe not found: $owui" }
 
-$svc = 'ShineosLocalAI'
+$svc = 'ShineosQA'
 $dataDir = Join-Path $AppDir 'data'
 $logDir = Join-Path $AppDir 'logs'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
@@ -50,7 +50,7 @@ if ($LASTEXITCODE -ne 0) { throw 'nssm install failed' }
 & $nssm set $svc AppRotateBytes 10485760 | Out-Null
 
 # 環境変数（値に空白を含むものは引用符で囲む。nssm 仕様）
-# DEFAULT_MODELS には configure_model.ps1 が作成する「Shineos Chat」を指定
+# DEFAULT_MODELS には configure_model.ps1 が作成する「社内知恵袋」を指定
 # （別名カスタムモデル。ツール無効化・思考モード無効化済みで「応答なし」を防止。
 #   素のモデルタグを指定するとツールが有効のままで応答なしになるため）
 # RAGのCHUNK_*は初回起動時のみ有効（PersistentConfig）→ 再インストールで確実に反映される
@@ -60,19 +60,23 @@ $envs = @(
     '"WEBUI_AUTH=False"',
     '"ENABLE_SIGNUP=False"',
     '"OLLAMA_BASE_URL=http://127.0.0.1:11434"',
-    '"DEFAULT_MODELS=Shineos Chat"',
+    '"DEFAULT_MODELS=社内知恵袋"',
     '"RAG_EMBEDDING_ENGINE=ollama"',
     '"RAG_EMBEDDING_MODEL=bge-m3"',
     '"CHUNK_SIZE=500"',
     '"CHUNK_OVERLAP=50"',
     '"RAG_TOP_K=3"',
+    # ハイブリッド検索（BM25 キーワード一致 + ベクトル意味一致のアンサンブル）。
+    # 社内特有の型番・規程番号・固有名詞を漏らさずヒットさせる（初回起動時の PersistentConfig）
+    '"ENABLE_RAG_HYBRID_SEARCH=True"',
+    '"HYBRID_BM25_WEIGHT=0.5"',
     '"ENABLE_WEB_SEARCH=True"',
     '"WEB_SEARCH_ENGINE=duckduckgo"',
     '"BYPASS_WEB_SEARCH_EMBEDDING_AND_RETRIEVAL=True"',
     '"BYPASS_WEB_SEARCH_WEB_LOADER=True"',
     '"ENABLE_NOTES=False"',
     '"ENABLE_VERSION_UPDATE_CHECK=False"',
-    '"WEBUI_NAME=Shineos Local AI"'
+    '"WEBUI_NAME=社内知恵袋"'
 )
 Log 'nssm set AppEnvironmentExtra'
 & $nssm set $svc AppEnvironmentExtra $envs | Out-Null

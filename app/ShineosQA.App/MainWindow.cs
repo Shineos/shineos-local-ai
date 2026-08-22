@@ -1,4 +1,4 @@
-﻿// ShineosLocalAI.App - Open WebUI を WebView2 でラップするデスクトップアプリ
+﻿// ShineosQA.App - Open WebUI を WebView2 でラップするデスクトップアプリ
 // - 起動: サービス起動確認 → /health 待ち → http://localhost:8080 を表示
 // - 終了: サービスを停止（閉じたら localhost:8080 も閉じる）
 // - ローディング中は中央にスピナー付きメッセージを表示
@@ -22,11 +22,11 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Wpf;
 
-namespace ShineosLocalAI
+namespace ShineosQA
 {
     public class MainWindow : Window
     {
-        const string ServiceName = "ShineosLocalAI";
+        const string ServiceName = "ShineosQA";
 
         readonly string AppUrl;
         readonly string HealthUrl;
@@ -61,7 +61,7 @@ namespace ShineosLocalAI
             AppUrl = "http://localhost:" + Port + "/?lang=ja-JP";
             HealthUrl = "http://localhost:" + Port + "/health";
 
-            Title = "Shineos Local AI";
+            Title = "社内知恵袋";
             Width = 1200;
             Height = 800;
             MinWidth = 800;
@@ -115,7 +115,7 @@ namespace ShineosLocalAI
 
             overlayTitle = new TextBlock
             {
-                Text = "Shineos Local AI",
+                Text = "社内知恵袋",
                 FontSize = 22,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
@@ -332,11 +332,11 @@ namespace ShineosLocalAI
 
         async Task Startup()
         {
-            ShowLoading("Shineos Local AI を起動しています...");
+            ShowLoading("社内知恵袋 を起動しています...");
 
             if (!ServiceExists())
             {
-                ShowError("Shineos Local AI がインストールされていません。\n\nインストーラ（ShineosLocalAI-Setup.exe）を実行してください。", false);
+                ShowError("社内知恵袋 がインストールされていません。\n\nインストーラ（ShineosQA-Setup.exe）を実行してください。", false);
                 return;
             }
 

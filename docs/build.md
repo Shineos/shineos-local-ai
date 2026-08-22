@@ -1,4 +1,4 @@
-# Shineos Local AI — 無料インストーラツール 構築ドキュメント
+# 社内知恵袋 — 無料インストーラツール 構築ドキュメント
 
 > 作成: 2026-08-20 | Shineos Inc.
 > ステータス: 実装完了（Windows実機検証は未実施 — §8 参照）
@@ -36,7 +36,7 @@ Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカ
 ### 2.1 インストール処理フロー
 
 ```
-[ShineosLocalAI-Setup-1.0.0.exe（ダブルクリック）]
+[ShineosQA-Setup-1.0.0.exe（ダブルクリック）]
     │
     ├─ ① 環境チェック（Windows 10/11 64bit・ポート8080空き・RAM検出）
     ├─ ② AIモデル選択ページ（既定: qwen2.5:3b / 軽量: qwen2.5:1.5b）
@@ -44,7 +44,7 @@ Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカ
     ├─ ④ Ollama を公式インストーラでサイレント導入（サービス不在時はNSSMフォールバック）
     ├─ ⑤ AIモデルダウンロード（qwen2.5:3b=1.9GB + nomic-embed-text=274MB）
     ├─ ⑥ venv 作成 → torch(CPU) → open-webui をインストール
-    ├─ ⑦ NSSM でサービス「ShineosLocalAI」登録（環境変数注入・自動起動ON）
+    ├─ ⑦ NSSM でサービス「ShineosQA」登録（環境変数注入・自動起動ON）
     ├─ ⑧ サービス起動 → /health ポーリング（最大180秒）
     └─ ⑨ 完了画面＋デスクトップに「はじめに.txt」とショートカット
             │
@@ -66,7 +66,7 @@ Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカ
 
 ### 2.3 環境変数（サービス注入分）
 
-サービス「ShineosLocalAI」には NSSM の `AppEnvironmentExtra` で以下を注入する（**システム環境変数は一切変更しない** → setx不使用・アンインストールが完全）：
+サービス「ShineosQA」には NSSM の `AppEnvironmentExtra` で以下を注入する（**システム環境変数は一切変更しない** → setx不使用・アンインストールが完全）：
 
 | 変数 | 値 | 理由 |
 |------|-----|------|
@@ -106,10 +106,10 @@ DuckDuckGo はレート制限（1時間あたりのリクエスト上限）が�
 1. `{app}` をエクスプローラで開く
 2. 管理者PowerShellで:
    ```
-   cd "C:\Program Files\ShineosLocalAI"
-   .\tools\nssm.exe set ShineosLocalAI AppEnvironmentExtra "DATA_DIR=C:\Program Files\ShineosLocalAI\data" "WEBUI_AUTH=False" "OLLAMA_BASE_URL=http://127.0.0.1:11434" "RAG_EMBEDDING_ENGINE=ollama" "RAG_EMBEDDING_MODEL=nomic-embed-text" "ENABLE_WEB_SEARCH=True" "WEB_SEARCH_ENGINE=searxng" "SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>"
+   cd "C:\Program Files\ShineosQA"
+   .\tools\nssm.exe set ShineosQA AppEnvironmentExtra "DATA_DIR=C:\Program Files\ShineosQA\data" "WEBUI_AUTH=False" "OLLAMA_BASE_URL=http://127.0.0.1:11434" "RAG_EMBEDDING_ENGINE=ollama" "RAG_EMBEDDING_MODEL=nomic-embed-text" "ENABLE_WEB_SEARCH=True" "WEB_SEARCH_ENGINE=searxng" "SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>"
    ```
-3. `.\tools\nssm.exe restart ShineosLocalAI`
+3. `.\tools\nssm.exe restart ShineosQA`
 
 ---
 
@@ -128,7 +128,7 @@ DuckDuckGo はレート制限（1時間あたりのリクエスト上限）が�
 | RAG | 内蔵RAG＋`RAG_EMBEDDING_ENGINE=ollama`でOllama埋め込みに切替可 → torch実行回避・自前RAGエンジン不要 | 自社RAGエンジン実装を廃止 |
 | Web検索 | `ENABLE_WEB_SEARCH` / `WEB_SEARCH_ENGINE` 環境変数が存在（ソース確認）。DuckDuckGoはAPIキー不要 | 「DuckDuckGo API」表記を修正（公式APIは存在しない） |
 | qwen2.5 / qwen3.5 | `qwen2.5:3b`=1.9GB / `qwen2.5:1.5b`=1.0GB / `qwen2.5:7b`=4.7GB がOllamaライブラリに存在。**Apache 2.0**。qwen3:4b は思考モード無効化不能のため不採用、qwen3.5:4b は think:false 適用で採用（v1.0.30） | モデルをqwen3系→qwen2.5系に変更（v1.0.24）、qwen3.5:4b を上級オプションとして追加（v1.0.30） |
-| ツール無効化 | Open WebUI はモデルに builtin ツール（write_note 等 34個）を提供する。**モデルがツール呼び出しを選ぶとチャットにテキスト回答が残らず「応答なし」になる**（2026-08-22 実機検証）。同名（id=base_model_id）のモデル設定は 0.10.x でマージされず無効化が効かないため、**別名カスタムモデル「Shineos Chat」**（base_model_id=実モデル）として builtinTools 全無効 + capabilities.tools=false + think:false を適用する | v1.0.30 で対応。DEFAULT_MODELS=Shineos Chat |
+| ツール無効化 | Open WebUI はモデルに builtin ツール（write_note 等 34個）を提供する。**モデルがツール呼び出しを選ぶとチャットにテキスト回答が残らず「応答なし」になる**（2026-08-22 実機検証）。同名（id=base_model_id）のモデル設定は 0.10.x でマージされず無効化が効かないため、**別名カスタムモデル「社内知恵袋」**（base_model_id=実モデル）として builtinTools 全無効 + capabilities.tools=false + think:false を適用する | v1.0.30 で対応。DEFAULT_MODELS=社内知恵袋 |
 | Ollama | `OllamaSetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART` 有効（winget実績）。公式DL URL 有効。MIT | — |
 | NSSM | 2.24・パブリックドメイン。`AppEnvironmentExtra KEY=VALUE` でサービスに環境変数注入可 | setx方式を廃止（環境変数汚染ゼロ） |
 
@@ -137,7 +137,7 @@ DuckDuckGo はレート制限（1時間あたりのリクエスト上限）が�
 ## 5. ファイル構成
 
 ```
-shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-local-ai）
+shineos-qa-assistant/                      # 本リポジトリ（Shineos/shineos-qa-assistant）
 ├── README.md                          # 概要・方針・利用モード・ライセンス
 ├── LICENSE                            # MIT（株式会社シャイオス）
 ├── docs/
@@ -161,7 +161,7 @@ shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-lo
     └── README.md                      # ベンダーバイナリの出典・更新手順
 ```
 
-### インストール後の配置（`{app}` = `C:\Program Files\ShineosLocalAI`）
+### インストール後の配置（`{app}` = `C:\Program Files\ShineosQA`）
 
 ```
 {app}\
@@ -196,7 +196,7 @@ shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-lo
 
 または GUI の Inno Setup で `installer\installer.iss` を開いて「Compile」。
 
-出力: `shineos-local-ai\dist\ShineosLocalAI-Setup-1.0.0.exe`
+出力: `shineos-qa-assistant\dist\ShineosQA-Setup-1.0.0.exe`
 
 ### 6.3 ビルド前チェックリスト
 
@@ -216,7 +216,7 @@ shineos-local-ai/                      # 本リポジトリ（Shineos/shineos-lo
 
 1. `installer.iss` の `#define MyAppVersion`（および `OutputBaseFilename`）を更新
 2. main に push し、`git tag v<新バージョン> && git push origin v<新バージョン>`
-3. GitHub Actions が自動ビルドし、GitHub Releases に `ShineosLocalAI-Setup-<version>.exe` を公開する（§10.1）
+3. GitHub Actions が自動ビルドし、GitHub Releases に `ShineosQA-Setup-<version>.exe` を公開する（§10.1）
 4. README のバージョンバッジ（shields.io）は自動更新される。ユーザーガイドのバージョン表記は必要に応じて更新
 
 ### 7.2 open-webui バージョンの更新
@@ -265,7 +265,7 @@ Python は **python.org の NUGet パッケージ（zip・ポータブル）** �
 - [ ] exeダブルクリック → UACの管理者権限要求が出る
 - [ ] モデル選択ページでRAMが正しく表示される（検出値±2GB）
 - [ ] 既定（qwen2.5:3b）でインストールがエラーなく完了（20〜60分）
-- [ ] 完了画面が表示され、デスクトップに「Shineos Local AI」ショートカットと「ShineosLocalAI-はじめに.txt」が作成される
+- [ ] 完了画面が表示され、デスクトップに「社内知恵袋」ショートカットと「ShineosQA-はじめに.txt」が作成される
 - [ ] ショートカットでブラウザが開き、**ログイン画面なしで**チャット画面が表示される
 - [ ] モデル「qwen2.5:3b」が選択でき、日本語の応答が返る
 
@@ -274,7 +274,7 @@ Python は **python.org の NUGet パッケージ（zip・ポータブル）** �
 - [ ] アップロード中もチャットが動作する（埋め込みがOllama経由で動いている）
 
 **T3. 自動起動（再起動テスト）**
-- [ ] PC再起動後、サービス「ShineosLocalAI」が自動起動し、http://localhost:8080 にアクセスできる
+- [ ] PC再起動後、サービス「ShineosQA」が自動起動し、http://localhost:8080 にアクセスできる
 - [ ] ※ Ollama が起動していない場合の症状確認（サービス「Ollama」または「ShineosOllama」の状態を確認。手動起動 `sc start Ollama` で復旧することを確認）
 
 **T4. Web検索（DuckDuckGo）**
@@ -284,9 +284,9 @@ Python は **python.org の NUGet パッケージ（zip・ポータブル）** �
 - [ ] ネットワーク切断状態でPC起動 → チャット・RAGが正常動作（Web検索ボタンOFFのまま）
 
 **T6. アンインストール**
-- [ ] 設定 → アプリ → Shineos Local AI → アンインストール
-- [ ] サービス「ShineosLocalAI」が停止・削除されている（`sc query ShineosLocalAI` がエラー）
-- [ ] `C:\Program Files\ShineosLocalAI` が完全に削除されている
+- [ ] 設定 → アプリ → 社内知恵袋 → アンインストール
+- [ ] サービス「ShineosQA」が停止・削除されている（`sc query ShineosQA` がエラー）
+- [ ] `C:\Program Files\ShineosQA` が完全に削除されている
 - [ ] システム環境変数に残留物がない（setx不使用のため）
 - [ ] デスクトップのショートカット・はじめに.txt が削除されている
 - [ ] ※ ユーザーの `.ollama` モデルは残す仕様（削除しない）
@@ -329,7 +329,7 @@ exe のビルドは **GitHub Actions が自動実行**する（`.github/workflow
 
 1. バージョンタグを push（例: `git tag v1.0.0 && git push origin v1.0.0`）
 2. ワークフローが Windows ランナーで Inno Setup 6.7.3 を導入 → `ISCC.exe installer\installer.iss` でビルド
-3. 成功すると **GitHub Releases に `ShineosLocalAI-Setup-<version>.exe` が自動添付**される
+3. 成功すると **GitHub Releases に `ShineosQA-Setup-<version>.exe` が自動添付**される
 
 手動ビルド（workflow_dispatch）でビルドのみ行いアーティファクト確認も可能。
 
@@ -352,14 +352,14 @@ GitHubコネクタ（Trusted Build System）方式は組織へのコネクタ設
 |------|------|-----|
 | Secret | `SIGNPATH_ORG_ID` | SignPath 組織ID |
 | Secret | `SIGNPATH_API_TOKEN` | SignPath プロジェクトの API トークン |
-| Variable | `SIGNPATH_PROJECT_SLUG` | `shineos-local-ai`（APIで作成済み・設定済み） |
-| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | `ShineosLocalAI-SigningPolicy`（コンソールで作成済み） |
+| Variable | `SIGNPATH_PROJECT_SLUG` | `shineos-qa-assistant`（APIで作成済み・設定済み） |
+| Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | `ShineosQA-SigningPolicy`（コンソールで作成済み） |
 
 **SignPath側の設定状況（2026-08-21）**:
-- プロジェクト `Shineos Local AI`（slug: `shineos-local-ai`）— APIで作成済み
-- アーティファクト設定 `initial`（既定・有効）: `ShineosLocalAI-Setup-*.exe` を Authenticode 署名
+- プロジェクト `社内知恵袋`（slug: `shineos-qa-assistant`）— APIで作成済み
+- アーティファクト設定 `initial`（既定・有効）: `ShineosQA-Setup-*.exe` を Authenticode 署名
 - 自己署名テスト証明書（`Shineos Inc.`・RSA4096・2029年まで）— コンソールで作成済み
-- 署名ポリシー `ShineosLocalAI-SigningPolicy` — コンソールで作成済み（Submitter: 管理者）
+- 署名ポリシー `ShineosQA-SigningPolicy` — コンソールで作成済み（Submitter: 管理者）
 
 **署名フロー**（workflow 内の `sign_with_signpath.ps1`）:
 1. `ISCC.exe` でビルド（未署名）
@@ -416,4 +416,4 @@ SmartScreenで「発行元: Shineos Inc.」と認識されるようにする手�
 | nomic-embed-text | Apache 2.0 | 同上 |
 | NSSM | パブリックドメイン | vendor/nssm.exe として同梱 |
 
-詳細は `shineos-local-ai/vendor/THIRD-PARTY-NOTICES.txt` を参照。
+詳細は `shineos-qa-assistant/vendor/THIRD-PARTY-NOTICES.txt` を参照。

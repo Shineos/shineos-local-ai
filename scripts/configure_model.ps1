@@ -1,6 +1,6 @@
 ﻿# configure_model.ps1 - Open WebUI のモデル設定を最適化する
-# - サインイン（admin@localhost / admin）して API 経由で「Shineos Chat」モデル設定を作成・上書き
-# - 別名カスタムモデル（id=Shineos Chat, base_model_id=実モデル）として作成する。
+# - サインイン（admin@localhost / admin）して API 経由で「社内知恵袋」モデル設定を作成・上書き
+# - 別名カスタムモデル（id=社内知恵袋, base_model_id=実モデル）として作成する。
 #   同名（id=base_model_id）で作成した設定は Open WebUI 0.10.x でモデル一覧に
 #   マージされず、ツールが無効化されないため（2026-08-22 実機検証）。
 # - meta.builtinTools を全て無効化し、モデルにツール（write_note 等）を提供しない。
@@ -49,9 +49,8 @@ try {
     $headers = @{ Authorization = "Bearer $($session.token)" }
     Log "signed in as $Email"
 
-    # ---------- 3. 「Shineos Chat」モデル設定を作成（同一 id は上書き） ----------
+    # ---------- 3. モデル設定を作成（同一 id は上書き） ----------
     # ツールを全て無効化（モデルが関数呼び出しを選んで「応答なし」になるのを防ぐ）
-    $appModel = 'Shineos Chat'
     $builtinTools = @{
         notes            = $false
         time             = $false
@@ -66,42 +65,77 @@ try {
         automations      = $false
         calendar         = $false
     }
-    $params = @{
-        think   = $false
-        num_ctx = 4096
-        # 応答の安定性向上（言語追従がぶれないように温度を下げる）
-        temperature = 0.5
-        # native でツール（Web検索）をモデルに提供する。
-        # web_search ツールのみ有効化し、他のツールは無効（「回答なし」防止）。
-        # ファイル生成ツール（PDF/PPT）は別途ツールサーバーとして登録する。
-        function_calling = 'native'
-        # ユーザーの言語に合わせて回答言語を切り替える。
-        # 質問の言語を判断できない場合のみデフォルトの日本語で回答する
-        system  = 'あなたは多言語対応のAIアシスタントです。ユーザーの質問が日本語の場合は日本語で、英語の場合は英語で、中国語の場合は中国語で回答してください。質問の言語を判断できない場合は、デフォルトの日本語で回答してください。'
-    }
-    $body = @{
-        id             = $appModel
-        base_model_id  = $Model
-        name           = $appModel
-        meta           = @{
-            capabilities  = @{ tools = $true }
-            builtinTools = $builtinTools
+
+    # 社内Q&A共通ルール（ガードレール + CoT 思考プロセス）
+    # - 結論先行・根拠（文書名・ページ数）明記・ハルシネーション完全遮断
+    # - 回答前に参照文書から事実を整理してから回答（スモールモデルの論理飛躍防止）
+    $baseRules = @'
+あなたは社内ナレッジベースのQ&Aアシスタント「社内知恵袋」です。社内規定・業務マニュアルなどのナレッジ文書を参照して、正確に回答してください。
+
+回答のルール:
+1. 結論から先に述べること。
+2. 回答の根拠となった該当文書名・該当箇所（ページ数があればページ数）を明記すること。
+3. 提示された参考文書内に回答がない場合は、推測せず「ナレッジに該当する記載がありません。〇〇課へ直接お問い合わせください」と回答すること。
+4. 回答する前に、参照文書から関連する事実を抜き出して整理し、その上で回答を作成すること。
+5. 質問が日本語の場合は日本語で回答すること。
+'@
+
+    # 用途別プリセット（社内知恵袋 = 汎用 / 経費精算ガイド / ITヘルプデスク）
+    $presets = @(
+        @{ id = '社内知恵袋'; system = $baseRules },
+        @{
+            id     = '経費精算ガイド'
+            system = $baseRules + @'
+
+あなたは経費精算専門のアシスタントです。経費精算ナレッジを参照し、経費精算の手順・ルール・上限額について正確に案内してください。該当する記載がない場合は、経理課への問い合わせを案内してください。
+'@
+        },
+        @{
+            id     = 'ITヘルプデスク'
+            system = $baseRules + @'
+
+あなたはITサポート専門のアシスタントです。ITサポートナレッジを参照し、社内システム・PC・パスワードなどの問い合わせに正確に案内してください。該当する記載がない場合は、ITヘルプデスクへの問い合わせを案内してください。
+'@
         }
-        params         = $params
-        access_grants  = @()
-        is_active      = $true
-    } | ConvertTo-Json -Depth 6
+    )
 
-    # PS 5.1 の Invoke-RestMethod は文字列 Body を ISO-8859-1 で送信し日本語が
-    # 化ける（既知のバグ）ため、UTF-8 バイト配列に変換して送る
-    $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+    foreach ($preset in $presets) {
+        $params = @{
+            think   = $false
+            num_ctx = 4096
+            # 応答の安定性向上（表記ブレ・揺らぎ防止のため温度を下げる）
+            temperature = 0.3
+            # native でツール（Web検索）をモデルに提供する。
+            # web_search ツールのみ有効化し、他のツールは無効（「回答なし」防止）。
+            # ファイル生成ツール（PDF/PPT）は別途ツールサーバーとして登録する。
+            function_calling = 'native'
+            system  = $preset.system
+        }
+        $body = @{
+            id             = $preset.id
+            base_model_id  = $Model
+            name           = $preset.id
+            meta           = @{
+                capabilities  = @{ tools = $true }
+                builtinTools = $builtinTools
+            }
+            params         = $params
+            access_grants  = @()
+            is_active      = $true
+        } | ConvertTo-Json -Depth 6
 
-    # 0.10.x は同名 id の再作成がエラーになるため、update を試してから create にフォールバック
-    $updated = $null
-    try {
-        $updated = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/models/model/update" -Headers $headers -Body $jsonBytes -ContentType 'application/json' -TimeoutSec 60
-    } catch {
-        $updated = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/models/create" -Headers $headers -Body $jsonBytes -ContentType 'application/json' -TimeoutSec 60
+        # PS 5.1 の Invoke-RestMethod は文字列 Body を ISO-8859-1 で送信し日本語が
+        # 化ける（既知のバグ）ため、UTF-8 バイト配列に変換して送る
+        $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+
+        # 0.10.x は同名 id の再作成がエラーになるため、update を試してから create にフォールバック
+        $updated = $null
+        try {
+            $updated = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/models/model/update" -Headers $headers -Body $jsonBytes -ContentType 'application/json' -TimeoutSec 60
+        } catch {
+            $updated = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/models/create" -Headers $headers -Body $jsonBytes -ContentType 'application/json' -TimeoutSec 60
+        }
+        Log "model configured: $($preset.id) (base=$Model, think=$($params.think), num_ctx=$($params.num_ctx), tools=disabled)"
     }
     # ---------- 4. UI言語を日本語に設定（フロントの初回表示に反映） ----------
     try {
@@ -110,7 +144,7 @@ try {
         Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/users/user/settings/update" -Headers $headers -Body $langBytes -ContentType 'application/json' -TimeoutSec 30 | Out-Null
         Log 'ui language set to ja-JP'
     } catch { Log 'WARNING: ui language setting failed' }
-    Log "model configured: $appModel (base=$Model, think=$($params.think), num_ctx=$($params.num_ctx), tools=disabled)"
+    Log "preset models configured: $($presets.id -join ', ')"
     Log 'configure_model done'
     exit 0
 }

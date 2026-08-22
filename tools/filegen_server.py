@@ -34,7 +34,7 @@ for _fpath, _sub, _name in _FONT_CANDIDATES:
         except Exception:
             continue
 
-OUT_DIR = Path(os.environ.get("FILEGEN_OUT", str(Path.home() / "shineos-filegen-out")))
+OUT_DIR = Path(os.environ.get("FILEGEN_OUT", str(Path.home() / "shineos-qa-out")))
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="File Generation Tools", version="1.0.0")

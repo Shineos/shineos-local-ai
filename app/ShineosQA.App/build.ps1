@@ -1,12 +1,12 @@
-# ShineosLocalAI.App ビルドスクリプト
+# ShineosQA.App ビルドスクリプト
 # - .NET Framework 4.x の csc.exe のみでビルド（SDK 不要）
 # - WebView2 SDK (Microsoft.Web.WebView2) を NuGet から取得
-# - 出力: dist\ShineosLocalAI.App\ShineosLocalAI.exe
+# - 出力: dist\ShineosQA.App\ShineosQA.exe
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $repo = Split-Path -Parent $root
-$outDir = Join-Path $repo 'dist\ShineosLocalAI.App'
+$outDir = Join-Path $repo 'dist\ShineosQA.App'
 $tmpDir = Join-Path $env:TEMP 'shineos-webview2-sdk'
 $sdkVer = '1.0.4129.50'
 $sdkPkg = Join-Path $tmpDir "microsoft.web.webview2.$sdkVer.nupkg"
@@ -41,7 +41,7 @@ $refs = @(
     "/r:$sdkLib\Microsoft.Web.WebView2.Wpf.dll"
 )
 
-$exe = Join-Path $outDir 'ShineosLocalAI.exe'
+$exe = Join-Path $outDir 'ShineosQA.exe'
 & $csc /nologo /target:winexe /platform:anycpu /out:$exe `
     "/win32icon:$repo\assets\app.ico" `
     (Join-Path $PSScriptRoot 'MainWindow.cs') `

@@ -1,19 +1,20 @@
 ﻿; ============================================================================
-; Shineos Local AI - インストーラ（Inno Setup 6.7.3）
+; 社内知恵袋 - インストーラ（Inno Setup 6.7.3）
 ;
 ; 無料ツールとして公開する「ダブルクリック一発・初期設定なし」の
 ; ローカルLLM + RAG + チャット環境インストーラ
 ;
-; ビルド: ISCC.exe installer.iss  → dist\ShineosLocalAI-Setup-<ver>.exe
-; 詳細: ../../docs/shineos-local-ai-build.md
+; ビルド: ISCC.exe installer.iss  → dist\ShineosQA-Setup-<ver>.exe
+; 詳細: ../../docs/shineos-qa-assistant-build.md
 ; ============================================================================
 
-#define MyAppName "Shineos Local AI"
-#define MyAppVersion "1.0.31"
+#define MyAppName "社内知恵袋"
+#define MyAppVersion "1.0.32"
 #define MyAppPublisher "Shineos Inc."
 #define MyAppURL "https://shineos.com"
 #define MyAppExeName "open-webui.exe"
-#define MyAppId "{{3E3DBB6F-6C7B-4E47-9FDB-C7CBE7DA9246}"
+; 社内知恵袋（shineos-qa-assistant）専用の新GUID（旧「Shineos Local AI」とは別アプリとして扱う）
+#define MyAppId "{{F8185C4F-C11F-4EF4-BF15-6EFFE7E5C47B}"
 
 ; --- 更新時に変更する定数 ----------------------------------------------------
 #define PythonVersion "3.12.10"        ; python.org のアーカイブURLに依存
@@ -27,7 +28,7 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL=https://shineos.com/contact/
-DefaultDirName={autopf}\ShineosLocalAI
+DefaultDirName={autopf}\ShineosQA
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -37,7 +38,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 OutputDir=..\dist
-OutputBaseFilename=ShineosLocalAI-Setup-{#MyAppVersion}
+OutputBaseFilename=ShineosQA-Setup-{#MyAppVersion}
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName}
@@ -56,6 +57,7 @@ Source: "..\scripts\setup_ollama.ps1";     DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\setup_openwebui.ps1";  DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\register_service.ps1"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\configure_model.ps1";   DestDir: "{tmp}"; Flags: dontcopy
+Source: "..\scripts\setup_knowledge.ps1";   DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\scripts\wait_ready.ps1";       DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\vendor\nssm.exe";              DestDir: "{tmp}"; Flags: dontcopy
 
@@ -69,13 +71,16 @@ Source: "..\tools\mcpo\templates\*";      DestDir: "{app}\tools\mcpo\templates";
 Source: "..\tools\mcpo\requirements.txt"; DestDir: "{app}\tools\mcpo"; Flags: ignoreversion
 Source: "..\scripts\start_openwebui.bat";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\scripts\configure_model.ps1";  DestDir: "{app}";       Flags: ignoreversion
+Source: "..\scripts\setup_knowledge.ps1";  DestDir: "{app}";       Flags: ignoreversion
 Source: "..\assets\app.ico";               DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\vendor\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}";     Flags: ignoreversion
 ; WebView2 ラッパーアプリ（URL入力不要・閉じたらサービス停止）
-Source: "..\dist\ShineosLocalAI.App\*";    DestDir: "{app}\app";   Flags: ignoreversion recursesubdirs
+Source: "..\dist\ShineosQA.App\*";    DestDir: "{app}\app";   Flags: ignoreversion recursesubdirs
+; ナレッジ（社内文書）: このフォルダに PDF/Markdown を置くとインストール時に自動登録される
+Source: "..\knowledge\*";             DestDir: "{app}\knowledge"; Flags: ignoreversion recursesubdirs
 
 [Icons]
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\app\ShineosLocalAI.exe"; IconFilename: "{app}\assets\app.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\app\ShineosQA.exe"; IconFilename: "{app}\assets\app.ico"
 
 ; --- アンインストール時の完全削除 --------------------------------------------
 [UninstallDelete]
@@ -85,9 +90,11 @@ Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\tools"
 Type: filesandordirs; Name: "{app}\app"
+Type: filesandordirs; Name: "{app}\knowledge"
 Type: files; Name: "{app}\install.log"
 Type: files; Name: "{app}\configure_model.ps1"
-Type: files; Name: "{userdesktop}\ShineosLocalAI-はじめに.txt"
+Type: files; Name: "{app}\setup_knowledge.ps1"
+Type: files; Name: "{userdesktop}\ShineosQA-はじめに.txt"
 
 [Code]
 var
@@ -114,6 +121,7 @@ begin
   ExtractTemporaryFile('setup_openwebui.ps1');
   ExtractTemporaryFile('register_service.ps1');
   ExtractTemporaryFile('configure_model.ps1');
+  ExtractTemporaryFile('setup_knowledge.ps1');
   ExtractTemporaryFile('wait_ready.ps1');
   ExtractTemporaryFile('nssm.exe');
 end;
@@ -165,7 +173,7 @@ begin
   RunPreflight;
 
   if not OsOk then
-    MsgBox('Windows 10 / 11（64bit）以外の環境では Shineos Local AI を利用できません。' + #13#10 +
+    MsgBox('Windows 10 / 11（64bit）以外の環境では 社内知恵袋 を利用できません。' + #13#10 +
            'インストールを中止してください。', mbError, MB_OK);
 
   if not PortFree then
@@ -198,7 +206,7 @@ var
 begin
   Result := False;
   ProgressPage := CreateOutputProgressPage('インストール中',
-    'Shineos Local AI のセットアップを実行しています。' + #13#10 +
+    '社内知恵袋 のセットアップを実行しています。' + #13#10 +
     '完了まで約20〜60分かかります（Ollama本体1.5GB＋AIモデル2.5GB＋Python・Open WebUI等、合計約7GBのダウンロードを含みます）。' + #13#10 +
     'インストール中はウィンドウを閉じないでください。');
   try
@@ -276,21 +284,21 @@ procedure WriteUsageFile(AppDir: String);
 var
   S: String;
 begin
-  S := 'Shineos Local AI - はじめに' + #13#10 +
+  S := '社内知恵袋 - はじめに' + #13#10 +
        '=====================================' + #13#10 + #13#10 +
        'ブラウザで http://localhost:' + IntToStr(SelectedPort) + ' を開くと、そのままチャットを始められます（ログイン不要・初期設定なし）。' + #13#10 + #13#10 +
        '・使用モデル: ' + SelectedModel + '（文書検索用: nomic-embed-text）' + #13#10 +
        '・RAG（文書の質問）: チャット画面の「+」→ ファイルアップロード → その内容について質問' + #13#10 +
        '・Web検索: チャット入力欄のWeb検索ボタンをONにすると利用できます（DuckDuckGo・APIキー不要）' + #13#10 +
        '・完全オフライン: Web検索ボタンをOFFのままにすれば、一切インターネットに接続しません' + #13#10 + #13#10 +
-       '・PCを再起動しても自動で起動します（Windowsサービス: ShineosLocalAI）' + #13#10 +
-       '・デスクトップの「Shineos Local AI」を開くとアプリ画面でチャットできます（URL入力不要）' + #13#10 +
+       '・PCを再起動しても自動で起動します（Windowsサービス: ShineosQA）' + #13#10 +
+       '・デスクトップの「社内知恵袋」を開くとアプリ画面でチャットできます（URL入力不要）' + #13#10 +
        '・アプリを閉じるとサービスも停止します（再起動後は自動で再開）' + #13#10 +
        '・ブラウザで使いたい場合は http://localhost:' + IntToStr(SelectedPort) + ' を開いてください' + #13#10 +
-       '・アンインストール: 設定アプリ → アプリ → Shineos Local AI' + #13#10 +
+       '・アンインストール: 設定アプリ → アプリ → 社内知恵袋' + #13#10 +
        '・再インストールするとデータ（アップロードした文書など）は初期化されます' + #13#10 + #13#10 +
        '不具合やご相談は https://shineos.com/contact/ まで。' + #13#10;
-  SaveStringToFile(ExpandConstant('{userdesktop}\ShineosLocalAI-はじめに.txt'), S, True);
+  SaveStringToFile(ExpandConstant('{userdesktop}\ShineosQA-はじめに.txt'), S, True);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -332,6 +340,14 @@ begin
           MsgBox('モデル設定に失敗しました。' + #13#10 +
                  'qwen3系モデルの場合、思考モードが無効化されないため応答が遅くなることがあります。' + #13#10 +
                  'ログ: ' + AppDir + '\logs\openwebui.err.log', mbInformation, MB_OK);
+
+        { ナレッジ自動登録（knowledgeフォルダの社内文書をベクトル化してRAG検索可能にする） }
+        ProgressPage.SetText('ナレッジ（社内文書）を登録しています...', '');
+        if not (RunPowerShell('setup_knowledge.ps1', '-BaseUrl "http://localhost:' + IntToStr(SelectedPort) + '" -KnowledgeDir "' + AppDir + '\knowledge" -LogFile "' + AppDir + '\logs\setup_knowledge.log"', RC) and (RC = 0)) then
+          MsgBox('ナレッジ登録に失敗しました。' + #13#10 +
+                 'インストール後に ' + AppDir + '\knowledge フォルダに文書を追加し、' + #13#10 +
+                 AppDir + '\setup_knowledge.ps1 を再実行してください。' + #13#10 +
+                 'ログ: ' + AppDir + '\logs\setup_knowledge.log', mbInformation, MB_OK);
       end;
 
       { 使用ポートをラッパーアプリ用に保存 }
@@ -342,13 +358,13 @@ begin
       { 一般ユーザーでもサービスを開始・停止できるように DACL を設定 }
       { （WebView2ラッパーアプリがUACなしで start/stop するために必要） }
       ProgressPage.SetText('サービスをユーザー操作可能に設定中...', '');
-      Exec('sc.exe', 'sdset ShineosLocalAI "D:(A;;0x34;;;AU)(A;;GA;;;SY)(A;;GA;;;BA)"', '', SW_HIDE, ewWaitUntilTerminated, RC);
+      Exec('sc.exe', 'sdset ShineosQA "D:(A;;0x34;;;AU)(A;;GA;;;SY)(A;;GA;;;BA)"', '', SW_HIDE, ewWaitUntilTerminated, RC);
 
       WizardForm.FinishedLabel.Caption :=
         'インストールが完了しました。' + #13#10 + #13#10 +
-        'デスクトップの「Shineos Local AI」をダブルクリックすると、アプリ画面が開きます（URL入力不要）。' + #13#10 +
+        'デスクトップの「社内知恵袋」をダブルクリックすると、アプリ画面が開きます（URL入力不要）。' + #13#10 +
         'アプリを閉じるとサービスも停止します。' + #13#10 + #13#10 +
-        '詳しい使い方はデスクトップの「ShineosLocalAI-はじめに.txt」を参照してください。';
+        '詳しい使い方はデスクトップの「ShineosQA-はじめに.txt」を参照してください。';
     finally
       ProgressPage.Hide;
       ProgressPage.Free;
@@ -368,7 +384,7 @@ begin
       'Ollama（LLM実行エンジン）とダウンロード済みAIモデル（選択モデルにより約2〜5GB）も削除しますか？' + #13#10 + #13#10 +
       '「はい」: Ollama本体・AIモデル・関連サービス・性能設定をすべて削除します。' + #13#10 +
       '　　　　 再インストール時はOllamaとモデルの再ダウンロード（約2時間）が必要です。' + #13#10 +
-      '「いいえ」: Shineos Local AI のファイルとサービスだけを削除し、Ollama は残します。',
+      '「いいえ」: 社内知恵袋 のファイルとサービスだけを削除し、Ollama は残します。',
       mbConfirmation, MB_YESNO) = IDYES;
 end;
 
@@ -417,8 +433,8 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     { サービス停止 → 削除（ファイル削除前に実行される） }
-    Exec(ExpandConstant('{sys}\sc.exe'), 'stop ShineosLocalAI', '', SW_HIDE, ewWaitUntilTerminated, RC);
-    Exec(ExpandConstant('{sys}\sc.exe'), 'delete ShineosLocalAI', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    Exec(ExpandConstant('{sys}\sc.exe'), 'stop ShineosQA', '', SW_HIDE, ewWaitUntilTerminated, RC);
+    Exec(ExpandConstant('{sys}\sc.exe'), 'delete ShineosQA', '', SW_HIDE, ewWaitUntilTerminated, RC);
     if UninstallRemoveOllama then
       RemoveOllamaCompletely
     else

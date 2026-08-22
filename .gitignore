@@ -13,3 +13,6 @@ __pycache__/
 
 # バックアップ・一時ファイル
 *.bak
+
+# ZCode プラン
+.zcode/
