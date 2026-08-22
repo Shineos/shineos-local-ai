@@ -17,6 +17,8 @@ set "RAG_EMBEDDING_MODEL=bge-m3"
 set "CHUNK_SIZE=500"
 set "CHUNK_OVERLAP=50"
 set "RAG_TOP_K=3"
+rem embedding は直列処理（同期）: 非同期だとローカルでキューが詰まりナレッジ登録が停滞する
+set "ENABLE_ASYNC_EMBEDDING=False"
 rem ハイブリッド検索（BM25 + ベクトル）: 型番・規程番号・固有名詞を漏らさずヒットさせる
 set "ENABLE_RAG_HYBRID_SEARCH=True"
 set "HYBRID_BM25_WEIGHT=0.5"

@@ -1,4 +1,4 @@
-# 社内知恵袋 — 無料インストーラツール 構築ドキュメント
+# 社内知恵袋 — 構築ドキュメント
 
 > 作成: 2026-08-20 | Shineos Inc.
 > ステータス: 実装完了（Windows実機検証は未実施 — §8 参照）
@@ -8,9 +8,9 @@
 
 ## 1. 目的・方針
 
-Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカルRAG環境を、**技術者でない一般のWindowsユーザーでもダブルクリック一発で導入できる無料ツール**として公開する。
+Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカルRAG環境をベースに、**社内規定・業務マニュアルをナレッジ化して社内Q&Aを実現するツール**として構築する。
 
-本ツールは**無料**で公開する。公開に際しては「無料であること」と問い合わせ先（https://shineos.com/contact/）を明示する。
+社内の利用者は、インストール後にナレッジ登録済みのQ&A環境をそのまま利用できる。問い合わせ先は https://shineos.com/contact/ 。
 
 ### 製品の約束（ユーザーへの約束事）
 
@@ -42,7 +42,7 @@ Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカ
     ├─ ② AIモデル選択ページ（既定: qwen2.5:3b / 軽量: qwen2.5:1.5b）
     ├─ ③ Python 3.12 を {app}\python にサイレント導入（PATH汚染なし）
     ├─ ④ Ollama を公式インストーラでサイレント導入（サービス不在時はNSSMフォールバック）
-    ├─ ⑤ AIモデルダウンロード（qwen2.5:3b=1.9GB + nomic-embed-text=274MB）
+    ├─ ⑤ AIモデルダウンロード（qwen2.5:3b=1.9GB + bge-m3=274MB）
     ├─ ⑥ venv 作成 → torch(CPU) → open-webui をインストール
     ├─ ⑦ NSSM でサービス「ShineosQA」登録（環境変数注入・自動起動ON）
     ├─ ⑧ サービス起動 → /health ポーリング（最大180秒）
@@ -76,7 +76,7 @@ Shineos Inc. が Zenn で公開した「Ollama + Open WebUI」によるローカ
 | `ENABLE_SIGNUP` | `False` | アカウント登録画面を出さない |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | ローカルOllamaを明示 |
 | `RAG_EMBEDDING_ENGINE` | `ollama` | 埋め込みをOllamaに切替（torch実行回避） |
-| `RAG_EMBEDDING_MODEL` | `nomic-embed-text` | ローカル埋め込みモデル |
+| `RAG_EMBEDDING_MODEL` | `bge-m3` | ローカル埋め込みモデル |
 | `ENABLE_WEB_SEARCH` | `True` | DuckDuckGo検索を利用可能に |
 | `WEB_SEARCH_ENGINE` | `duckduckgo` | APIキー不要のプロバイダ |
 
@@ -107,7 +107,7 @@ DuckDuckGo はレート制限（1時間あたりのリクエスト上限）が�
 2. 管理者PowerShellで:
    ```
    cd "C:\Program Files\ShineosQA"
-   .\tools\nssm.exe set ShineosQA AppEnvironmentExtra "DATA_DIR=C:\Program Files\ShineosQA\data" "WEBUI_AUTH=False" "OLLAMA_BASE_URL=http://127.0.0.1:11434" "RAG_EMBEDDING_ENGINE=ollama" "RAG_EMBEDDING_MODEL=nomic-embed-text" "ENABLE_WEB_SEARCH=True" "WEB_SEARCH_ENGINE=searxng" "SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>"
+   .\tools\nssm.exe set ShineosQA AppEnvironmentExtra "DATA_DIR=C:\Program Files\ShineosQA\data" "WEBUI_AUTH=False" "OLLAMA_BASE_URL=http://127.0.0.1:11434" "RAG_EMBEDDING_ENGINE=ollama" "RAG_EMBEDDING_MODEL=bge-m3" "ENABLE_WEB_SEARCH=True" "WEB_SEARCH_ENGINE=searxng" "SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>"
    ```
 3. `.\tools\nssm.exe restart ShineosQA`
 
@@ -334,7 +334,7 @@ exe のビルドは **GitHub Actions が自動実行**する（`.github/workflow
 手動ビルド（workflow_dispatch）でビルドのみ行いアーティファクト確認も可能。
 
 配布ページ（Releases）に以下を明記する:
-- 無料であること・商用サポートの問い合わせ先（https://shineos.com/contact/）
+- 社内Q&Aツールの説明・問い合わせ先（https://shineos.com/contact/）
 - 動作要件（Windows 10/11 64bit・8GB RAM以上・空き15GB・インストール時にネット接続）
 
 ### 10.2 コード署名（SignPath.io）
@@ -422,7 +422,7 @@ SmartScreenで「発行元: Shineos Inc.」と認識されるようにする手�
 | Ollama | MIT | インストーラが自動導入 |
 | Open WebUI | BSD-3-Clause | pipで導入 |
 | qwen2.5（3b/1.5b） | Apache 2.0 | 商用・再配布可 |
-| nomic-embed-text | Apache 2.0 | 同上 |
+| bge-m3 | Apache 2.0 | 同上 |
 | NSSM | パブリックドメイン | vendor/nssm.exe として同梱 |
 
 詳細は `shineos-qa-assistant/vendor/THIRD-PARTY-NOTICES.txt` を参照。

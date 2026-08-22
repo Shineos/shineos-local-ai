@@ -107,7 +107,7 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 ## 問い合わせ
 
 - 不具合・導入支援・カスタマイズのご相談: https://shineos.com/contact/
-- 本ツールは **無料** です。製造業向けオフラインAI（図面・マニュアル検索）のご相談もお気軽にどうぞ
+- 社内Q&A・ナレッジ運用に関するご相談もお気軽にどうぞ
 
 ## ファイル生成（PDF / PPTX / Word）ツールサーバー
 
@@ -127,20 +127,38 @@ Windows機で [Inno Setup 6.7.3](https://jrsoftware.org/isinfo.php) を導入し
 3. チャットで「PDF（または Word / PowerPoint）を作成して…」と依頼
 
 ### 生成ファイルの保存先
-- 軽量サーバー: `C:\Users\zheng\shineos-qa-out\`（環境変数 `FILEGEN_OUT` で変更可）
+- 軽量サーバー: `%USERPROFILE%\shineos-qa-out\`（各ユーザーのホームディレクトリ配下。環境変数 `FILEGEN_OUT` で変更可）
 - MCPO: `{app}\data\mcpo_output\`
 
 ## 管理者向けの推奨設定（要・管理者権限）
 
-以下の設定は管理者権限が必要なため、インストーラ再実行で自動適用されます。個別に適用する場合は管理者PowerShellで:
+以下の設定はインストーラが自動適用します。個別に再適用する場合は管理者PowerShellで:
 
 ```powershell
-# 1. Ollama の性能チューニング（KV量子化・Flash Attention・常駐制限）
+# 1. Ollama の性能チューニング（KV量子化 q8_0・Flash Attention・モデル常駐制限）
+#    - 応答高速化とメモリ節約のため、インストール時に自動適用済み
 & "C:\Program Files\ShineosQA\setup_ollama.ps1" -AppDir "C:\Program Files\ShineosQA" -TmpDir $env:TEMP
 
-# 2. RAG設定の反映（bge-m3・同期エンベッディング・コンテキスト圧縮）
-#    ※ 再インストール時に自動適用されます
+# 2. ナレッジ（社内文書）の再登録
+#    - {app}\knowledge フォルダに PDF・Markdown を追加した後に実行
+& "C:\Program Files\ShineosQA\setup_knowledge.ps1"
 ```
+
+### インストール時に自動適用される設定
+
+| カテゴリ | 設定内容 |
+|---------|---------|
+| Embedding | **bge-m3**（日本語・多言語対応の高精度モデル）・直列処理（ENABLE_ASYNC_EMBEDDING=False でキュー停滞防止） |
+| 検索 | **ハイブリッド検索**（BM25 キーワード一致 + ベクトル意味一致・BM25重み 0.5）・チャンク 500/オーバーラップ 50・TOP_K 3 |
+| モデル | 「社内知恵袋」（汎用）＋「経費精算ガイド」「ITヘルプデスク」の用途別プリセットを自動作成 |
+| プロンプト | ガードレール固定（結論先行・根拠の文書名/該当箇所の明記・ナレッジ外は「該当する記載がありません」と回答・CoT による事実整理） |
+| ナレッジ | `{app}\knowledge` フォルダの PDF/Markdown を自動登録（サブフォルダ単位でコレクション分類） |
+| その他 | 日本語UI・バージョンアップ通知無効化・閉じたときのモデルアンロード |
+
+### 推奨される追加設定（Open WebUI 管理画面・要管理者権限）
+
+- **コンテキスト圧縮**: 管理画面 → 設定 → チャット → コンテキスト圧縮を有効化（長文チャットのメモリ節約・応答安定化）
+- **RAG 関連の詳細調整**: 管理画面 → 設定 → ドキュメント（検索結果の表示件数・関連性しきい値など）
 
 ## UI設定（言語・通知）
 

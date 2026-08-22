@@ -66,6 +66,9 @@ $envs = @(
     '"CHUNK_SIZE=500"',
     '"CHUNK_OVERLAP=50"',
     '"RAG_TOP_K=3"',
+    # embedding は直列処理（同期）にする。非同期だとローカル（Ollama）でキューが詰まり
+    # ナレッジ登録が停滞するため（初回起動時の PersistentConfig）
+    '"ENABLE_ASYNC_EMBEDDING=False"',
     # ハイブリッド検索（BM25 キーワード一致 + ベクトル意味一致のアンサンブル）。
     # 社内特有の型番・規程番号・固有名詞を漏らさずヒットさせる（初回起動時の PersistentConfig）
     '"ENABLE_RAG_HYBRID_SEARCH=True"',
