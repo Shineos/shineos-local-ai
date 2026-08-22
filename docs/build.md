@@ -361,6 +361,15 @@ GitHubコネクタ（Trusted Build System）方式は組織へのコネクタ設
 - 自己署名テスト証明書（`Shineos Inc.`・RSA4096・2029年まで）— コンソールで作成済み
 - 署名ポリシー `ShineosQA-SigningPolicy` — コンソールで作成済み（Submitter: 管理者）
 
+> **⚠️ v1.0.32（リポジトリ名変更）時の注意**:
+> インストーラのファイル名が `ShineosLocalAI-Setup-*.exe` → `ShineosQA-Setup-*.exe` に変わったため、
+> **SignPath プロジェクトのアーティファクト設定（ファイル名パターン）と GitHub Variables
+> （`SIGNPATH_PROJECT_SLUG` / `SIGNPATH_SIGNING_POLICY_SLUG`）を新名前に更新するまで、
+> 署名が `ProcessingFailed` になり GitHub Release が作成されません**（2026-08-23 実機確認）。
+> SignPath コンソール → プロジェクト設定 → Artifact Configuration でパターンを
+> `ShineosQA-Setup-*.exe` に変更し、GitHub リポジトリ設定 → Secrets and variables → Actions で
+> スラッグを確認・更新したうえで、workflow_dispatch またはタグ push で再実行してください。
+
 **署名フロー**（workflow 内の `sign_with_signpath.ps1`）:
 1. `ISCC.exe` でビルド（未署名）
 2. `POST /SigningRequests/SubmitWithArtifact` で署名リクエスト送信
